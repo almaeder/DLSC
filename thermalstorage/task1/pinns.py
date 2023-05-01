@@ -461,7 +461,7 @@ class Pinns:
     ################################################################################################
     def plotting(
         self: object,
-        name: str = "plot.png"
+        name: str = "plot_task1.png"
     ):
         """
         Plot the learned fluid and solid temperature

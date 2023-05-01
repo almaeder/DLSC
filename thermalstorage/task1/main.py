@@ -11,9 +11,9 @@ main_path = os.path.abspath(os.path.dirname(__file__))
 parent_path = os.path.abspath(os.path.join(main_path, ".."))
 sys.path.append(parent_path)
 
-import pinns
+from task1 import pinns
 
-torch.autograd.set_detect_anomaly(True)
+torch.autograd.set_detect_anomaly(False)
 torch.manual_seed(128)
 
 print(f"PyTorch version: {torch.__version__}")
@@ -105,8 +105,8 @@ if __name__ == "__main__":
         axs[1].set_ylabel("T")
         axs[1].set_xlabel("t")
         axs[1].set_title("Dirichlet Condition")
-
-        fig.savefig("input_points.png")
+        fig_path = os.path.join(main_path, "input_points_task1.png")
+        fig.savefig(fig_path)
 
     
     n_epochs = 2
@@ -149,18 +149,20 @@ if __name__ == "__main__":
                     args.path)
     
     # plot the loss and the predicted solution
-    if args.plot == "True":
+    if args.plot == "True" and args.train == "True":
         # plot the loss
         fig = plt.figure(dpi=150)
         plt.grid(True, which="both", ls=":")
         plt.plot(np.arange(1, len(hist) + 1), hist, label="Train Loss")
         plt.xscale("log")
         plt.legend()
-        fig.savefig("train_loss.png")
+        fig_path = os.path.join(main_path, "train_loss_task1.png")
+        fig.savefig(fig_path)
 
+    if args.plot == "True":
         # plot the predicted solution
-        pinn.plotting()
-
+        fig_path = os.path.join(main_path, "plot_task1.png")
+        pinn.plotting(name=fig_path)
 
     # load given data
     data_path = os.path.join(main_path, "TestingData.txt")
