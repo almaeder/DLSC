@@ -138,3 +138,28 @@ The first approach to sample the boundaries was to use a mask and enable/disable
 
 <br />
 <br />
+
+# Task 3
+## Task Description
+The goal o the final task is to predict future data from a given time line with operator learning.
+Discrete samples of the fluid/solid temperature are given for the time $[0,T]$ with $T=520000\,\text{s}$. 
+In particular, the fluid/solid temperature should be predicted in the range $[T,T_{end}]$ with $T_{end}=602168\,\text{s}$.
+$210$ equally spaced samples are given. The predictions should be made at $34$ sample with the same spacing as the training data.
+
+## Solution Approach
+As operator learning should be used to solve the problem, we have to rewrite the given problem setting:
+
+Find the operator $\mathbb{G}: X \rightarrow Y$, which fulfills the equation:
+(Explicit function spaces omitted)
+
+$$\mathbb{G}\left(\vec{v}\right) = \vec{u}$$
+
+Where $\vec{v}$/$\vec{u}$ are the fluid/solid temperature on a domain $[T_1,T_2]$/$[T_3,T_4]$.
+
+### Sampling Training Data
+Depending on how to 
+
+### Architecture
+The popular DeepOnet is used. 
+![](deeponet.png)
+Where

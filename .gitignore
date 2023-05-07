@@ -162,5 +162,4 @@ cython_debug/
 # Linter and mypy
 mypy.ini
 pylintrc
-*.png
 *.pth

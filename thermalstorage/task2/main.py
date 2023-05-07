@@ -1,3 +1,6 @@
+"""
+This script is used to train the PINN model for task 2.
+"""
 import torch
 import os
 import sys
