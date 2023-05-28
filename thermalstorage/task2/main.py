@@ -61,7 +61,7 @@ if __name__ == "__main__":
         default="True",
         choices=["True", "False"],
         help="If model should be trained before inference"
-    )    
+    )
     parser.add_argument(
         "-p",
         "--path",
@@ -125,9 +125,9 @@ if __name__ == "__main__":
     n_epochs = 1
     optimizer_LBFGS = optim.LBFGS(pinn.approximate_solution.parameters(),
                                 lr=float(0.5),
-                                max_iter=500,
-                                max_eval=500,
-                                history_size=150,
+                                max_iter=2000,
+                                max_eval=2000,
+                                history_size=100,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)
     optimizer_ADAM = optim.Adam(pinn.approximate_solution.parameters(),

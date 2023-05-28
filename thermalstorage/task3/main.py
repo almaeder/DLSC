@@ -42,7 +42,7 @@ def generate_training_data(
     x_branch_train = np.empty((num_train, 2*num_branch), dtype=np.float32)
     x_trunk_train = np.empty((num_train, 1), dtype=np.float32)
     y_train_fluid = np.empty((num_train, 1), dtype=np.float32)
-    y_train_fluid = np.empty((num_train, 1), dtype=np.float32)
+    y_train_solid = np.empty((num_train, 1), dtype=np.float32)
 
     # set the branch and trunk net input
     # and the solution samples
@@ -58,9 +58,9 @@ def generate_training_data(
 
         # fluid and solid temperature flattened
         y_train_fluid[j,:] = data_raw["tf0"].astype(np.float32).values[j+num_branch:j+num_branch+1]
-        y_train_fluid[j,:] = data_raw["ts0"].astype(np.float32).values[j+num_branch:j+num_branch+1]
+        y_train_solid[j,:] = data_raw["ts0"].astype(np.float32).values[j+num_branch:j+num_branch+1]
 
-    return (x_branch_train, x_trunk_train), y_train_fluid, y_train_fluid
+    return (x_branch_train, x_trunk_train), y_train_fluid, y_train_solid
 
 def normalize(
       x: np.ndarray,
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     mode_f.compile("adam", lr=0.005, metrics=["mean l2 relative error"])
     mode_s.compile("adam", lr=0.005, metrics=["mean l2 relative error"])
     losshistory_f, train_state_f = mode_f.train(iterations=3000)
-    losshistory_s, train_state_s = mode_s.train(iterations=1000)
+    losshistory_s, train_state_s = mode_s.train(iterations=3000)
 
     # Plot the loss trajectory
     dde.utils.plot_loss_history(losshistory_f)

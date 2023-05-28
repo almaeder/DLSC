@@ -57,9 +57,9 @@ class Pinns:
         self.space_dimensions = 1
 
         # Parameter to balance role of data and PDE
-        self.lambda_d = 20
-        self.lambda_n = 20
-        self.lambda_t = 20
+        self.lambda_d = 30
+        self.lambda_n = 10
+        self.lambda_t = 250
 
         # Dense NN to approximate the solution of the underlying equations
         # todo tune network

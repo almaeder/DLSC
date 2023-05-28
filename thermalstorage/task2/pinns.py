@@ -67,7 +67,7 @@ class Pinns:
         # Parameter to balance role of data and PDE
         self.lambda_d = 20
         self.lambda_n = 20
-        self.lambda_t = 20
+        self.lambda_t = 200
         self.lambda_meas = 4000
 
         # Dense NN to approximate the solution of the underlying equations

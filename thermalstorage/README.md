@@ -157,9 +157,9 @@ $$\mathbb{G}\left(\vec{v}\right) = \vec{u}$$
 Where $\vec{v}$/$\vec{u}$ are the fluid/solid temperature on a domain $[T_1,T_2]$/$[T_3,T_4]$.
 
 ### Sampling Training Data
-Depending on how to 
+The training data is sampled from the a given long measurement through sampling intervals of certain length and the temperature afterwards. Therefore it is a tradeoff between the number of training samples and the information contained in one sample. It turned out that longer intervals are preferable.
 
 ### Architecture
-The popular DeepOnet is used. 
+The popular DeepOnet architecture is used. 
 ![](deeponet.png)
-Where
+Where the branch net input are the fluid/solid temperature on one of the intervals and the trunk net input is the time of next sample.

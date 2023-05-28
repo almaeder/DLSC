@@ -1,0 +1,135 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amsfonts}
+\usepackage{amssymb}
+\usepackage{breqn}
+\title{Derivations}
+\author{Alexander Maeder}
+\date{April 2023}
+
+\begin{document}
+\section{Task 1}
+The first task is a rather straightforward one. 
+One can directly adapt the functions given in tutorial four.
+The main difference lies in the given boundary conditions
+since they are mixed boundary conditions for both fluid/solid temperature
+and that one should solve for two quantities.
+
+The chosen neural network architecture is a simple feed-forward network with five hidden layers and 100 neurons per layer.
+The network has two outputs where by arbitrary choice the first one is the fluid temperature and the second one is the solid temperature.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task1/input_points_task1.png}
+\caption{Sampled training data and the dirichlet boundary condition.}
+\label{fig:task1_samples}
+\end{figure}
+
+The loss function is constructed in the same way as in exercise four.
+The internal loss, the boundary loss and the initial loss are summed.
+The difference is that the boundary loss contains four sub-losses for the four boundary conditions.
+Therefore, one needs four training data sets for the boundary conditions.
+
+The second order LBFGS method was used for optimization without deeper considerations.
+The amount of randomly sampled data was chosen to fully utilize the GPU memory.  
+The amount of data is quiet excessive and is shown in Figure \ref{fig:task1_samples}.
+In Figure \ref{fig:task1_loss} the loss change during training is presented. Here the training duration was chosen too long, as the loss goes into saturation.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task1/train_loss_task1.png}
+\caption{The training loss change.}
+\label{fig:task1_loss}
+\end{figure}
+
+In Figure \ref{fig:task1_plot} one can see the predicted fluid and solid temperature.
+One can see that the training of the neural network was not perfect since there are aberrations in both temperatures.
+On the left boundary, there is the region before the jump of the dirichlet condition
+where both temperatures should be at $T_0$ since there are no other heat sources, but temperature above $T_0$ is predicted.
+This error could not be fixed with hyperparameter tuning.
+
+
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task1/plot_task1.png}
+\caption{Preditections for fluid and solid temperature.}
+\label{fig:task1_plot}
+\end{figure}
+
+\section{Task 2}
+In the second task, an inverse problem was solved.
+The solid temperature was treated as an unknown parameter and only the equation for the liquid temperature was solved.
+The solution presented is based on exercise five, in which the same PDE as in exercise four was solved, but as an inverse problem.
+The neural network architecture is the same as in exercise one, a fully connected feedforward network with two outputs for the temperatures.
+The main difference is that for the inverse problem, not only the unsupervised PDE/boundary loss is used,
+but a loss from the given samples is added. 
+Also, the amount of unsupervised data had to be reduced so as not to overshadow the supervised data.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task2/input_points_task2.png}
+\caption{Sampled training data.}
+\label{fig:task2_samples}
+\end{figure}
+
+Another difference is that not only one phase was to be simulated. Therefore, time-dependent boundary conditions had to be applied.
+For this, one can simply sample each time interval independently for the boundary losses.
+As in task 1, Figure \ref{fig:task2_samples} shows the unsupervised training data and the applied Dirichlet constraints on the left and right edges. 
+LBFGS was again used for optimization with manually set hyperparameters. No test-train splitting was performed because the PDE loss acted as a strong regularizer.
+Moreover, in Figure \ref{fig:task2_loss} the error while training can be seen.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task2/train_loss_task2.png}
+\caption{Loss change.}
+\label{fig:task2_loss}
+\end{figure}
+
+Figure \ref{fig:task2_predictions} shows the given samples and predictions.
+In general, the predicted fluid temperature agrees with the trend of the samples. 
+Nevertheless, the sharp features of the given samples are not well predicted, which also happened in task one for the jump in the Dirichlet boundary condition.
+It is rather hard to verify the predicted solid temperature if one has no intuition about the expected results.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task2/prediction_task2.png}
+\caption{Given samples for the fluid temperature and predictions for both temperatures.}
+\label{fig:task2_predictions}
+\end{figure}
+
+\section{Task 3}
+In task 3, the problem is to predict the time evolution of the fluid/solid temperature at $x=0$
+only through one long measurement for times after this measurement.
+Operator learning should be used to solve the problem,
+but first the goal has to be rewritten to fit a machine learning problem.
+
+The idea is to generate multiple supervised samples from the given measurement.
+From a given small number of fluid/solid temperature points the next point should be predicted.
+Then in the end, the network is applied iteratively to predict the time evolution,
+starting with the last few points of the long measurement.
+
+This can be formulated in an operator learning frame work with a DeepONet.
+The input for the branch net are functions on a fixed time interval.
+The input for the trunk net are the time points where to predict the next point. In this case, it is only the next point.
+With this, the DeepONet can be trained to predict the next point in the time evolution.
+A tricky point is that the training functions are taken from one measurement
+and therefore not independent. One could argue how much this solution approach is true operator learning as presented in the lecture.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task3/train_train_pred_task3.png}
+\caption{Prediction and given solution for the given time points.}
+\label{fig:task4_predt}
+\end{figure}
+
+
+In Figure \ref{fig:task4_predt} the predicted time evolution is shown.
+The predictions are well fitted to the inputs.
+Through a test-train split, one can see that the predictions are not overfitted.
+
+\begin{figure}[ht!]
+\includegraphics[width=1\textwidth]{task3/train_test_pred_task3.png}
+\caption{Prediction on the given time points and the future ones.}
+\label{fig:task4_pred}
+\end{figure}
+
+In Figure \ref{fig:task4_pred} the predicted time evolution is shown.
+The predictions after 500000s are the future predictions 
+and they match the trend of the previous time series with some aberrations.
+
+
+\end{document}

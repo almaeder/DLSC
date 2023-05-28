@@ -5,3 +5,8 @@
 Task1.txt
 Task2.txt
 Task3.txt
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz

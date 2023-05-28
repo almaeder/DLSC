@@ -1,13 +1,13 @@
 """
 This script is used to train the PINN model for task 1
 """
-import torch
 import os
 import sys
 import matplotlib.pyplot as plt
+import argparse
+import torch
 from torch import optim
 import numpy as np
-import argparse
 import pandas as pd
 
 main_path = os.path.abspath(os.path.dirname(__file__))
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         default="True",
         choices=["True", "False"],
         help="If model should be trained before inference"
-    )    
+    )
     parser.add_argument(
         "-p",
         "--path",
@@ -72,9 +72,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # number of the different training points
-    # gpu vram limit of 8GB
-    n_int = 200000 # 256
-    n_sb_tb = 20000 # 64
+    # gpu vram limit of 16GB
+    n_int = 120000 # 256
+    n_sb_tb = 12000 # 64
     n_sb = n_sb_tb
     n_tb = n_sb_tb
     # batch sizes
@@ -112,12 +112,12 @@ if __name__ == "__main__":
         fig.savefig(fig_path)
 
     
-    n_epochs = 2
+    n_epochs = 1
     optimizer_LBFGS = optim.LBFGS(pinn.approximate_solution.parameters(),
                                 lr=float(0.5),
-                                max_iter=2000,
-                                max_eval=2000,
-                                history_size=150,
+                                max_iter=800,
+                                max_eval=800,
+                                history_size=100,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)
     optimizer_ADAM = optim.Adam(pinn.approximate_solution.parameters(),
