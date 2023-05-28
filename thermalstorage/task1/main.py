@@ -78,7 +78,7 @@ if __name__ == "__main__":
     n_sb = n_sb_tb
     n_tb = n_sb_tb
     # batch sizes
-    nb = 5
+    nb = 1
     batchsize_int = n_int // nb
     batchsize_bc = n_sb_tb // nb
     pinn = pinns.Pinns(n_int, n_sb, n_tb, batchsize_int, batchsize_bc, device)
@@ -115,8 +115,8 @@ if __name__ == "__main__":
     n_epochs = 2
     optimizer_LBFGS = optim.LBFGS(pinn.approximate_solution.parameters(),
                                 lr=float(0.5),
-                                max_iter=100,
-                                max_eval=100,
+                                max_iter=2000,
+                                max_eval=2000,
                                 history_size=150,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)
