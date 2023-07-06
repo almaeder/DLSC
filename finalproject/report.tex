@@ -1,0 +1,44 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amsfonts}
+\usepackage{amssymb}
+\usepackage{breqn}
+\title{Derivations}
+\author{Alexander Maeder\\Leonard Deuschle}
+\date{July 2023}
+
+\begin{document}
+\section{Theory}
+\begin{align*}\label{eq:problemsetting}
+    \mathcal{L}u\left(x\right) &= \lambda u\left(x\right)\\
+    u\left(x_l\right) &= u\left(x_r\right) = u_b
+\end{align*}
+
+\begin{equation}\label{eq:loss1}
+    L = \frac{1}{M} \sum \limits_{i = 0}^{M-1} \left(\mathcal{L}u\left(x_i,\lambda\right) - \lambda u\left(x_i,\lambda\right)\right)^2 + \alpha_{norm}  L_{norm} + \alpha_{drive} L_{drive}
+\end{equation}
+
+\begin{equation}\label{eq:loss_norm}
+    L_{norm} = \left(\sum \limits_{i = 0}^{M-1}u\left(x_i,\lambda\right)^2  + \frac{M}{x_r - x_l}\right)^2
+\end{equation}
+
+\begin{equation}\label{eq:loss_drive}
+    L_{drive} = e^{c - \lambda}
+\end{equation}
+
+
+\begin{equation}\label{eq:loss2}
+    L = \frac{1}{M} \sum \limits_{i = 0}^{M-1} \left(\mathcal{L}u\left(x_i,\lambda\right) - \lambda u\left(x_i,\lambda\right)\right)^2 + \alpha_{norm} L_{norm} + \alpha_{ortho} L_{ortho}
+\end{equation}
+
+\begin{equation}\label{eq:loss_ortho}
+    L_{ortho} = \sum \limits_{i = 0}^{M-1} u\left(x_i,\lambda\right) u_{prev}\left(x_i,\lambda_{prev}\right)
+\end{equation}
+
+\begin{align*}\label{eq:ansatz}
+    u\left(x,\lambda\right) &= u_b + g\left(x\right) NN\left(x,\lambda\right)\\
+    g\left(x\right) &= (1- e^{-\left(x-x_l\right)^2})(1- e^{-\left(x-x_r\right)^2})
+\end{align*}
+
+
+\end{document}
