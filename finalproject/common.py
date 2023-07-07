@@ -24,7 +24,8 @@ class NeuralNet(nn.Module):
         regularization_param: int,
         regularization_exp: int,
         retrain_seed: int,
-        eigenvalue_range: float
+        eigenvalue_range: float,
+        device
     ):
         """Initialize the Neural Network
 
@@ -55,7 +56,7 @@ class NeuralNet(nn.Module):
         # Regularization exponent
         self.regularization_exp = regularization_exp
 
-        self.eigenvalue = eigenvalue_range*torch.rand(1, requires_grad=True)
+        self.eigenvalue = eigenvalue_range*torch.rand(1, requires_grad=True, device=device)
 
         self.input_layer = nn.Linear(self.input_dimension + 1, self.neurons)
         self.hidden_layers = nn.ModuleList([nn.Linear(self.neurons, self.neurons)
@@ -64,9 +65,15 @@ class NeuralNet(nn.Module):
         self.retrain_seed = retrain_seed
         # Random Seed for weight initialization
         self.init_xavier()
+        self.device = device
 
     def get_eigenvalue(self):
-        return self.eigenvalue[0]
+        """_summary_
+
+        Returns:
+            (torch.Tensor): eigenvalue tensor
+        """
+        return self.eigenvalue
 
 
     def forward(self,
@@ -82,7 +89,7 @@ class NeuralNet(nn.Module):
         """
         # The forward function performs
         # the set of affine and non-linear transformations defining the network
-        input_d = torch.cat((input_data, self.eigenvalue*torch.ones(input_data.shape[0], 1)), dim=1)
+        input_d = torch.cat((input_data, self.eigenvalue*torch.ones(input_data.shape[0], 1, device=self.device)), dim=1)
         hidden_data = self.activation(self.input_layer(input_d))
         for _, layer in enumerate(self.hidden_layers):
             hidden_data = self.activation(layer(hidden_data))
