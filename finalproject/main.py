@@ -24,10 +24,10 @@ if __name__ == "__main__":
 
     # number of the different training points
     # gpu vram limit of 16GB
-    n_int = 1000
+    n_int = 10000
 
     # number of batches
-    nb = 1
+    nb = 100
     # batch size
     batchsize_int = n_int // nb
     xl = 0.0
@@ -37,20 +37,21 @@ if __name__ == "__main__":
 
 
     
-    n_epochs = 1
-    optimizer_LBFGS = optim.LBFGS(pinn.approximate_solution.parameters(),
+    n_epochs = 20
+    parameters = list(pinn.approximate_solution.parameters()) + [pinn.approximate_solution.eigenvalue]
+    optimizer_LBFGS = optim.LBFGS(parameters,
                                 lr=float(0.5),
-                                max_iter=2000,
-                                max_eval=2000,
-                                history_size=100,
+                                max_iter=20000,
+                                max_eval=20000,
+                                history_size=1000,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)
-    optimizer_ADAM = optim.Adam(pinn.approximate_solution.parameters(),
-                                lr=float(0.001))
+    optimizer_ADAM = optim.Adam(parameters,
+                                lr=float(0.01))
     # choose optimizer
-    optimizer = optimizer_LBFGS
+    optimizer = optimizer_ADAM
 
-    hist = pinn.fit(num_epochs=n_epochs,
+    hist = pinn.fit_multiple(num_epochs=n_epochs,
                 optimizer=optimizer,
                 verbose=True)
     
@@ -65,5 +66,5 @@ if __name__ == "__main__":
     fig.savefig(fig_path)
 
     # plot the predicted solution
-    fig_path = os.path.join(main_path, "prediction.png")
-    pinn.plotting(name=fig_path)
+    fig_path = os.path.join(main_path, "prediction")
+    pinn.plotting_multiple(name=fig_path)

@@ -163,3 +163,4 @@ cython_debug/
 mypy.ini
 pylintrc
 *.pth
+.vscode/

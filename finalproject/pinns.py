@@ -4,6 +4,7 @@ from torch.optim.optimizer import Optimizer
 import common
 import typing
 import matplotlib.pyplot as plt
+import copy
 class Pinns:
     """
     Class to create pinns for the thermal storage equation of task2.
@@ -24,17 +25,16 @@ class Pinns:
         self.domain_extrema = torch.tensor([[xl_, xr_]])
         self.space_dimensions = 1
         self.alpha_norm = 1.0
-        self.alpha_ortho = 0.0
+        self.alpha_ortho = 100.0
         self.alpha_drive = 1.0
-        self.c = 10.0
-
-        self.func_prev = torch.zeros(batchsize_, device=device)
+        self.c = 14.0
+        self.num_eigenfunctions = 2
 
         self.approximate_solution = common.NeuralNet(
             input_dimension=self.domain_extrema.shape[0],
             output_dimension=1,
-            n_hidden_layers=3,
-            neurons=20,
+            n_hidden_layers=5,
+            neurons=100,
             regularization_param=0.1,
             regularization_exp=2.,
             retrain_seed=42,
@@ -46,6 +46,7 @@ class Pinns:
         self.soboleng = torch.quasirandom.SobolEngine(dimension=self.domain_extrema.shape[0])
 
         self.training_set_int = self.assemble_datasets()
+        self.eigenfunctions = []
 
     def convert(
         self: object,
@@ -134,7 +135,7 @@ class Pinns:
         self: object,
         eigenvalue: torch.Tensor
     ) -> torch.Tensor:
-        return torch.exp(self.c - eigenvalue)
+        return torch.exp(-self.c + eigenvalue)
 
     def compute_norm_loss(
         self: object,
@@ -148,9 +149,14 @@ class Pinns:
 
     def compute_ortho_loss(
         self: object,
+        input_int: torch.Tensor,
         func: torch.Tensor
     ) -> torch.Tensor:
-        return torch.sum(func*self.func_prev)
+        with torch.no_grad():
+            func_prev = torch.zeros_like(func, requires_grad=False)    
+            for eigenfunction in self.eigenfunctions:
+                func_prev += eigenfunction(input_int)*(1-torch.exp(-(input_int-self.domain_extrema[:,0])**2))*(1-torch.exp(-(input_int-self.domain_extrema[:,1])**2)) + self.ub
+        return torch.sum(func*func_prev)
 
     def compute_loss(
         self: object,
@@ -170,19 +176,19 @@ class Pinns:
 
         # enable auto differentiation
         input_int.requires_grad = True
+        self.domain_extrema = self.domain_extrema.to(self.device)
+        func = self.approximate_solution(input_int)*(1-torch.exp(-(input_int-self.domain_extrema[:,0])**2))*(1-torch.exp(-(input_int-self.domain_extrema[:,1])**2)) + self.ub
 
-        func = self.approximate_solution(input_int)
-
-        eigenvalue = self.approximate_solution.get_eigenvalue()
+        eigenvalue = self.approximate_solution.eigenvalue
 
         residual_pde = self.compute_pde_residual(input_int,func,eigenvalue)
-        loss_pde = torch.Tensor([torch.mean(abs(residual_pde)**2)], device=self.device)
+        loss_pde = torch.mean(abs(residual_pde)**2)
 
         loss_norm = self.compute_norm_loss(func)
 
         loss_drive = self.compute_drive_loss(eigenvalue)
 
-        loss_ortho = self.compute_ortho_loss(func)
+        loss_ortho = self.compute_ortho_loss(input_int,func)
 
         loss = torch.log10(loss_pde + self.alpha_norm*loss_norm + self.alpha_drive*loss_drive + self.alpha_ortho*loss_ortho)
 
@@ -190,10 +196,11 @@ class Pinns:
             print("Total loss: ",       round(loss.item(), 4))
             # scale certain terms for fair comparison
 
-            print("PDE Loss: ",    round(torch.log10(loss_pde.item()), 4))
+            print("PDE Loss: ",    round(torch.log10(loss_pde).item(), 4))
             print("Drive Loss: ",    round(torch.log10(self.alpha_drive*(loss_drive)).item(), 4))
             print("Ortho Loss: ",    round(torch.log10(self.alpha_ortho*(loss_ortho)).item(), 4))
             print("Norm Loss: ",   round(torch.log10(self.alpha_norm *(loss_norm)).item(), 4))
+            print("Eigenvalue: ",   round(eigenvalue.item(), 4))
 
         return loss
 
@@ -233,7 +240,7 @@ class Pinns:
                                 inp_train_int,
                                 verbose=verbose
                                             )
-                    loss.backward()
+                    loss.backward(retain_graph=True)
 
                     history.append(loss.item())
                     return loss
@@ -244,10 +251,51 @@ class Pinns:
 
         return history
 
+    def fit_multiple(
+            self: object,
+            num_epochs: int,
+            optimizer: Optimizer,
+            verbose: str = True
+    ) -> typing.List[float]:
+        """
+        Trains the model
+
+        Args:
+            num_epochs (int): Number of epochs to train
+            optimizer (Optimizer): Which optimizer to use
+            verbose (str, optional): If additional information should be printed. Defaults to True.
+
+        Returns:
+            typing.List[float]: List of losses every epoch
+        """
+        history = []
+
+        # Loop over eigenfunctions
+        for i in range(self.num_eigenfunctions):
+            history += self.fit(num_epochs, optimizer, verbose=verbose)
+            solution_copy = common.NeuralNet(
+                        input_dimension=self.domain_extrema.shape[0],
+                        output_dimension=1,
+                        n_hidden_layers=5,
+                        neurons=100,
+                        regularization_param=0.1,
+                        regularization_exp=2.,
+                        retrain_seed=42,
+                        eigenvalue_range=self.c,
+                        device=self.device
+                    ).to(self.device)
+            solution_copy.load_state_dict(copy.deepcopy(self.approximate_solution.state_dict()))
+            for param in solution_copy.parameters():
+                param.requires_grad = False
+            solution_copy.eigenvalue = copy.deepcopy(self.approximate_solution.eigenvalue.detach())
+            self.eigenfunctions.append(solution_copy)
+
+        return history
+
     ################################################################################################
     def plotting(
         self: object,
-        name: str = "plot_task2.png"
+        name: str = "plot.png"
     ):
         """
         Plot the learned fluid and solid temperature
@@ -255,18 +303,49 @@ class Pinns:
         Args:
             name (str, optional): Name of the plot. Defaults to "plot.png".
         """
-        inputs = self.soboleng.draw(100000)
+        inputs = self.soboleng.draw(100)
+        inputs = inputs.to(self.device)
         inputs = self.convert(inputs)
-        output = self.approximate_solution(inputs.to(self.device)).detach().cpu()
+        output = (self.approximate_solution(inputs)*(1-torch.exp(-(inputs-self.domain_extrema[:,0])**2))*(1-torch.exp(-(inputs-self.domain_extrema[:,1])**2)) + self.ub).detach().cpu()
 
         # plot both fluid and solid temperature
         fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
-        axs[0].plot(inputs[:, 0].detach(), output[:,0])
+        axs.scatter(inputs[:, 0].detach().cpu(), output[:,0])
 
         # set the labels
-        axs[0].set_xlabel("x")
-        axs[0].set_ylabel("u")
-        axs[0].grid(True, which="both", ls=":")
+        axs.set_xlabel("x")
+        axs.set_ylabel("u")
+        axs.grid(True, which="both", ls=":")
 
         plt.show()
-        fig.savefig(name)
+        fig.savefig(name + ".png")
+
+    def plotting_multiple(
+        self: object,
+        name: str = "plot"
+    ):
+        """
+        Plot the learned fluid and solid temperature
+
+        Args:
+            name (str, optional): Name of the plot. Defaults to "plot.png".
+        """
+        inputs = self.soboleng.draw(100)
+        inputs = inputs.to(self.device)
+        inputs = self.convert(inputs)
+
+        for i,eigenfunction in enumerate(self.eigenfunctions):
+            print(eigenfunction.eigenvalue.detach().item())
+
+            output = (eigenfunction(inputs)*(1-torch.exp(-(inputs-self.domain_extrema[:,0])**2))*(1-torch.exp(-(inputs-self.domain_extrema[:,1])**2)) + self.ub).detach().cpu()
+
+            # plot both fluid and solid temperature
+            fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
+            axs.scatter(inputs[:, 0].detach().cpu(), output[:,0])
+
+            # set the labels
+            axs.set_xlabel("x")
+            axs.set_ylabel("u")
+            axs.grid(True, which="both", ls=":")
+
+            fig.savefig(name + "_" + str(i) + ".png")

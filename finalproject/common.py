@@ -56,7 +56,7 @@ class NeuralNet(nn.Module):
         # Regularization exponent
         self.regularization_exp = regularization_exp
 
-        self.eigenvalue = eigenvalue_range*torch.rand(1, requires_grad=True, device=device)
+        self.eigenvalue = torch.tensor([eigenvalue_range/2], requires_grad=True, device=device)
 
         self.input_layer = nn.Linear(self.input_dimension + 1, self.neurons)
         self.hidden_layers = nn.ModuleList([nn.Linear(self.neurons, self.neurons)
@@ -66,15 +66,6 @@ class NeuralNet(nn.Module):
         # Random Seed for weight initialization
         self.init_xavier()
         self.device = device
-
-    def get_eigenvalue(self):
-        """_summary_
-
-        Returns:
-            (torch.Tensor): eigenvalue tensor
-        """
-        return self.eigenvalue
-
 
     def forward(self,
         input_data
