@@ -24,7 +24,7 @@ class NeuralNet(nn.Module):
         regularization_param: int,
         regularization_exp: int,
         retrain_seed: int,
-        eigenvalue_range: float,
+        eigenvalue_init: float,
         device
     ):
         """Initialize the Neural Network
@@ -37,7 +37,7 @@ class NeuralNet(nn.Module):
             regularization_param    (int): Regularization parameter
             regularization_exp      (int): Type of regularization
             retrain_seed            (int): Random seed for weight initialization
-            eigenvalue_range        (int): Range to in which the eigenvalue is initialized
+            eigenvalue_init         (int):
         Returns:
             _type_: _description_
         """
@@ -56,7 +56,8 @@ class NeuralNet(nn.Module):
         # Regularization exponent
         self.regularization_exp = regularization_exp
 
-        self.eigenvalue = torch.tensor([eigenvalue_range/2], requires_grad=True, device=device)
+        self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=False, device=device)
+        # self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=True, device=device)
 
         self.input_layer = nn.Linear(self.input_dimension + 1, self.neurons)
         self.hidden_layers = nn.ModuleList([nn.Linear(self.neurons, self.neurons)
@@ -104,36 +105,3 @@ class NeuralNet(nn.Module):
             if 'weight' in name:
                 reg_loss = reg_loss + torch.norm(param, self.regularization_exp)
         return self.regularization_param * reg_loss
-
-
-def fit(model, training_set, num_epochs, optimizer, p, verbose=True):
-    history = list()
-
-    # Loop over epochs
-    for epoch in range(num_epochs):
-        if verbose: print("################################ ", epoch, " ################################")
-
-        running_loss = list([0])
-
-        # Loop over batches
-        for j, (x_train_, u_train_) in enumerate(training_set):
-            def closure():
-                # zero the parameter gradients
-                optimizer.zero_grad()
-                # forward + backward + optimize
-                u_pred_ = model(x_train_)
-                # Item 1. below
-                loss = torch.mean((u_pred_.reshape(-1, ) - u_train_.reshape(-1, )) ** p) + model.regularization()
-                # Item 2. below
-                loss.backward()
-                # Compute average training loss over batches for the current epoch
-                running_loss[0] += loss.item()
-                return loss
-
-            # Item 3. below
-            optimizer.step(closure=closure)
-
-        if verbose: print('Loss: ', (running_loss[0] / len(training_set)))
-        history.append(running_loss[0])
-
-    return history
