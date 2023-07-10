@@ -24,35 +24,38 @@ if __name__ == "__main__":
 
     # number of the different training points
     # gpu vram limit of 16GB
-    n = 20000
+    n_int = 10000
+    n_sb = 1000
 
     # number of batches
-    nb = 1
+    nb_int = 100
+    nb_sb = 10
     # batch size
-    batchsize_int = n // nb
+    batchsize_int = n_int // nb_int
+    batchsize_sb = n_sb // nb_sb
     xl = 0.0
     xr = 1.0
     ub = 0.0
-    pinn = pinns.Pinns(n, batchsize_int, xl, xr, ub, device)
+    pinn = pinns.Pinns(n_int, n_sb, batchsize_int, batchsize_sb, xl, xr, ub, device)
 
 
     
     n_epochs = 1
-    # parameters = list(pinn.approximate_solution.parameters()) + [pinn.approximate_solution.eigenvalue]
-    parameters = list(pinn.approximate_solution.parameters())
+    parameters = list(pinn.approximate_solution.parameters()) + [pinn.approximate_solution.eigenvalue]
+    # parameters = list(pinn.approximate_solution.parameters())
     optimizer_LBFGS = optim.LBFGS(parameters,
-                                lr=float(0.5),
-                                max_iter=10000,
-                                max_eval=10000,
-                                history_size=500,
+                                lr=float(1),
+                                max_iter=2000,
+                                max_eval=2000,
+                                history_size=200,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)
     optimizer_ADAM = optim.Adam(parameters,
-                                lr=float(0.02))
+                                lr=float(0.5))
     # choose optimizer
     optimizer = optimizer_LBFGS
 
-    hist = pinn.fit(num_epochs=n_epochs,
+    hist = pinn.fit_multiple(num_epochs=n_epochs,
                 optimizer=optimizer,
                 verbose=True)
     
@@ -61,12 +64,12 @@ if __name__ == "__main__":
     fig = plt.figure(dpi=150)
     plt.grid(True, which="both", ls=":")
     plt.plot(np.arange(1, len(hist) + 1), hist, label="Train Loss")
-    plt.xscale("log")
-    plt.yscale("log")
+    # plt.xscale("log")
+    # plt.yscale("log")
     plt.legend()
     fig_path = os.path.join(main_path, "train_loss.png")
     fig.savefig(fig_path)
 
     # plot the predicted solution
     fig_path = os.path.join(main_path, "prediction")
-    pinn.plotting(name=fig_path)
+    pinn.plotting_multiple(name=fig_path)

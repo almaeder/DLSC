@@ -56,8 +56,8 @@ class NeuralNet(nn.Module):
         # Regularization exponent
         self.regularization_exp = regularization_exp
 
-        self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=False, device=device)
-        # self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=True, device=device)
+        # self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=False, device=device)
+        self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=True, device=device)
 
         self.input_layer = nn.Linear(self.input_dimension + 1, self.neurons)
         self.hidden_layers = nn.ModuleList([nn.Linear(self.neurons, self.neurons)

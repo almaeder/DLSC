@@ -1,6 +1,8 @@
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
+from torch import optim
 import common
 import typing
 import matplotlib.pyplot as plt
@@ -11,43 +13,51 @@ class Pinns:
     """
     def __init__(
         self: object,
-        n_: int,
-        batchsize_: int,
-        xl_: float,
-        xr_: float,
-        ub_: float,
+        n_int: int,
+        n_sb: int,
+        batchsize_int: int,
+        batchsize_sb: int,
+        xl: float,
+        xr: float,
+        ub: float,
         device: torch.device
     ):
         self.device = device
-        self.n = n_
-        self.batchsize = batchsize_
-        self.ub = ub_
-        self.domain_extrema = torch.tensor([[xl_, xr_]])
+        self.n_int = n_int
+        self.n_sb = n_sb
+        self.batchsize_int = batchsize_int
+        self.batchsize_sb = batchsize_sb
+        self.ub = ub
+        self.domain_extrema = torch.tensor([[xl, xr]])
         self.domain_extrema = self.domain_extrema.to(self.device)
         self.space_dimensions = 1.0
-        self.alpha_norm = 1.0
-        self.alpha_ortho = 0.0
-        self.alpha_drive = 0.0
-        self.c = 1000.0
-        self.num_eigenfunctions = 2
-
+        self.alpha_sb = 10.0
+        self.alpha_norm = 20000.0
+        self.alpha_ortho = 200000.0
+        self.alpha_drive = 200
+        self.alpha_regu = 1
+        self.c = 20.0
+        self.num_eigenfunctions = 4
+        self.num_layer = 3
+        self.size_layer = 100
         self.approximate_solution = common.NeuralNet(
             input_dimension=self.domain_extrema.shape[0],
             output_dimension=1,
-            n_hidden_layers=10,
-            neurons=200,
+            n_hidden_layers=self.num_layer,
+            neurons=self.size_layer,
             regularization_param=0.02,
             regularization_exp=2.,
             retrain_seed=42,
-            eigenvalue_init=3.14159265359,
+            eigenvalue_init=5.0,
             device=device
         ).to(device)
 
         # Generator of Sobol sequences
         self.soboleng = torch.quasirandom.SobolEngine(dimension=self.domain_extrema.shape[0])
 
-        self.training_set_int = self.assemble_datasets()
+        self.training_set_int, self.training_set_sbl, self.training_set_sbr = self.assemble_datasets()
         self.eigenfunctions = []
+
 
     def convert(
         self: object,
@@ -78,9 +88,17 @@ class Pinns:
         Returns:
             Tuple(torch.Tensor, torch.Tensor): Input and Output data
         """
-        input_int = self.convert(self.soboleng.draw(self.n))
+        input_int = self.convert(self.soboleng.draw(self.n_int))
         output_int = torch.zeros((input_int.shape[0], 1))
         return input_int, output_int
+    
+
+    def add_boundary_points(self):
+        input_sbl = self.domain_extrema[:,0]*torch.ones((self.n_sb, self.domain_extrema.shape[0]), device=self.device)
+        input_sbr = self.domain_extrema[:,1]*torch.ones((self.n_sb, self.domain_extrema.shape[0]), device=self.device)
+        output_sbl = torch.zeros((input_sbl.shape[0], 1), device=self.device)
+        output_sbr = torch.zeros((input_sbr.shape[0], 1), device=self.device)
+        return input_sbl, input_sbr, output_sbl, output_sbr
 
     def assemble_datasets(self):
         """
@@ -89,30 +107,37 @@ class Pinns:
         Returns:
             Interior dataloader
         """
-        # interior data, spatial boundary conditions handled through ansatz
-        input_int, output_int   = self.add_interior_points() # S_int
+        # interior data, (spatial boundary conditions handled through ansatz, did not work yet)
+        input_int, output_int   = self.add_interior_points()
+        input_sbl, input_sbr, output_sbl, output_sbr = self.add_boundary_points()
 
         # load data to device
         input_int, output_int     = input_int.to(self.device), output_int.to(self.device)
+        # input_sbl, input_sbr      = input_sbl.to(self.device), input_sbr.to(self.device)
+        # output_sbl, output_sbr    = output_sbl.to(self.device), output_sbr.to(self.device)
 
         # create dataloader
-        training_set_int        = DataLoader(torch.utils.data.TensorDataset(input_int, output_int), batch_size=self.batchsize, shuffle=False)
-        
-        return training_set_int
+        training_set_int = DataLoader(torch.utils.data.TensorDataset(input_int, output_int), batch_size=self.batchsize_int, shuffle=False)
+        training_set_sbl = DataLoader(torch.utils.data.TensorDataset(input_sbl, output_sbl), batch_size=self.batchsize_sb, shuffle=False)
+        training_set_sbr = DataLoader(torch.utils.data.TensorDataset(input_sbr, output_sbr), batch_size=self.batchsize_sb, shuffle=False)
+
+        return training_set_int, training_set_sbl, training_set_sbr
 
     def compute_ansatz(
         self: object,
         input_int: torch.Tensor,
         nn: torch.Tensor
     ) -> torch.Tensor:
+        # return nn
         return (nn*
-                (1-torch.exp(-1000*(input_int-self.domain_extrema[:,0])**2))*
-                (1-torch.exp(-1000*(input_int-self.domain_extrema[:,1])**2)) + self.ub)
+                (1-torch.exp(-100*(input_int-self.domain_extrema[:,0])**2))*
+                (1-torch.exp(-100*(input_int-self.domain_extrema[:,1])**2)) + self.ub)
+    
 
 
     def compute_pde_residual(
         self: object,
-        inputs: torch.Tensor,
+        input_int: torch.Tensor,
         func: torch.Tensor,
         eigenvalue: torch.Tensor
     ) -> torch.Tensor:
@@ -124,21 +149,23 @@ class Pinns:
         # In our case ui = u(xi), therefore the line below returns:
         # grad_u = [[dsum_u/dx1, dsum_u/dy1],[dsum_u/dx2, dsum_u/dy2],[dsum_u/dx3, dL/dy3],...,[dsum_u/dxm, dsum_u/dyn]]
         # and dsum_u/dxi = d(u1 + u2 + u3 + u4 + ... + un)/dxi = d(u(x1) + u(x2) u3(x3) + u4(x4) + ... + u(xn))/dxi = dui/dxi
-        grad_func = torch.autograd.grad(func.sum(), inputs, create_graph=True)[0]
+        grad_func = torch.autograd.grad(func.sum(), input_int, create_graph=True)[0]
 
         grad_func_x = grad_func[:, 0]
 
-        grad_func_xx = torch.autograd.grad(grad_func_x.sum(), inputs, create_graph=True)[0][:, 0]
+        grad_func_xx = torch.autograd.grad(grad_func_x.sum(), input_int, create_graph=True)[0][:, 0]
 
         residual_pde = grad_func_xx + eigenvalue**2 * func
 
-        return residual_pde.reshape(-1, )
+        return residual_pde
+
 
     def compute_drive_loss(
         self: object,
         eigenvalue: torch.Tensor
     ) -> torch.Tensor:
-        return torch.exp(-self.c + eigenvalue)
+        # lower and upper limit for eigenvalue
+        return torch.exp(10*(-self.c + eigenvalue)) + torch.exp(-10*eigenvalue)
 
     def compute_norm_loss(
         self: object,
@@ -159,11 +186,15 @@ class Pinns:
             func_prev = torch.zeros_like(func, requires_grad=False)    
             for eigenfunction in self.eigenfunctions:
                 func_prev += self.compute_ansatz(input_int,eigenfunction(input_int))
-        return torch.sum(func*func_prev)
+        return (torch.sum(func*func_prev))**2
 
     def compute_loss(
         self: object,
-        inputs: torch.Tensor,
+        input_int: torch.Tensor,
+        input_sbl: torch.Tensor,
+        input_sbr: torch.Tensor,
+        output_sbl: torch.Tensor,
+        output_sbr: torch.Tensor,
         verbose: bool = True
     ) -> torch.Tensor:
         """
@@ -178,27 +209,34 @@ class Pinns:
         """
 
         # enable auto differentiation
-        inputs.requires_grad = True
+        input_int.requires_grad = True
 
-        func = self.compute_ansatz(inputs,self.approximate_solution(inputs))
+        func = self.compute_ansatz(input_int,self.approximate_solution(input_int))
 
         eigenvalue = self.approximate_solution.eigenvalue
 
-        residual_pde = self.compute_pde_residual(inputs,func,eigenvalue)
+        residual_pde = self.compute_pde_residual(input_int,func,eigenvalue)
+        residual_sbl = self.compute_ansatz(input_sbl,self.approximate_solution(input_sbl)) - output_sbl
+        residual_sbr = self.compute_ansatz(input_sbr,self.approximate_solution(input_sbr)) - output_sbr
+
         loss_pde = torch.mean(abs(residual_pde)**2)
+        loss_sbl = self.alpha_sb*torch.mean(abs(residual_sbl)**2)
+        loss_sbr = self.alpha_sb*torch.mean(abs(residual_sbr)**2)
 
-        loss_norm = self.compute_norm_loss(func)
+        loss_norm = self.alpha_norm*self.compute_norm_loss(func)
 
-        loss_drive = self.compute_drive_loss(eigenvalue)
+        loss_drive = self.alpha_drive*self.compute_drive_loss(eigenvalue)
 
-        loss_ortho = self.compute_ortho_loss(inputs,func)
+        loss_ortho = self.alpha_ortho*self.compute_ortho_loss(input_int,func)
 
-        loss_regu = self.approximate_solution.regularization()
+        loss_regu = self.alpha_regu*self.approximate_solution.regularization()
 
         loss = torch.log10(loss_pde +
-                           self.alpha_norm*loss_norm +
-                           self.alpha_drive*loss_drive +
-                           self.alpha_ortho*loss_ortho +
+                           loss_sbl +
+                           loss_sbr +
+                           loss_norm +
+                           loss_drive +
+                           loss_ortho +
                            loss_regu)
 
         if verbose:
@@ -206,9 +244,10 @@ class Pinns:
             # scale certain terms for fair comparison
 
             print("PDE Loss: ",    round(torch.log10(loss_pde).item(), 4))
-            print("Drive Loss: ",    round(torch.log10(self.alpha_drive*(loss_drive)).item(), 4))
-            print("Ortho Loss: ",    round(torch.log10(self.alpha_ortho*(loss_ortho)).item(), 4))
-            print("Norm Loss: ",   round(torch.log10(self.alpha_norm *(loss_norm)).item(), 4))
+            print("Boundary Loss: ",    round(torch.log10(loss_sbl+loss_sbr).item(), 4))
+            print("Drive Loss: ",    round(torch.log10(loss_drive).item(), 4))
+            print("Ortho Loss: ",    round(torch.log10(loss_ortho).item(), 4))
+            print("Norm Loss: ",   round(torch.log10(loss_norm).item(), 4))
             print("Regu Loss: ",   round(torch.log10(loss_regu).item(), 4))
             print("Eigenvalue: ",   round(eigenvalue.item(), 4))
 
@@ -241,13 +280,22 @@ class Pinns:
             # Loop over batches
             for _, (
                     (inp_train_int, _),
-                    ) in enumerate(zip(self.training_set_int)):
+                    (inp_train_sbl, out_train_sbl),
+                    (inp_train_sbr, out_train_sbr)
+                    ) in enumerate(zip(
+                    self.training_set_int,
+                    self.training_set_sbl,
+                    self.training_set_sbr)):
                 def closure():
 
                     verbose=True
                     optimizer.zero_grad()
                     loss = self.compute_loss(
                                 inp_train_int,
+                                inp_train_sbl,
+                                inp_train_sbr,
+                                out_train_sbl,
+                                out_train_sbr,
                                 verbose=verbose
                                             )
                     loss.backward()
@@ -286,8 +334,8 @@ class Pinns:
             solution_copy = common.NeuralNet(
                         input_dimension=self.domain_extrema.shape[0],
                         output_dimension=1,
-                        n_hidden_layers=5,
-                        neurons=100,
+                        n_hidden_layers=self.num_layer,
+                        neurons=self.size_layer,
                         regularization_param=0.1,
                         regularization_exp=2.,
                         retrain_seed=42,
@@ -297,10 +345,20 @@ class Pinns:
             solution_copy.load_state_dict(copy.deepcopy(self.approximate_solution.state_dict()))
             for param in solution_copy.parameters():
                 param.requires_grad = False
-            # solution_copy.eigenvalue = copy.deepcopy(self.approximate_solution.eigenvalue.detach())
             solution_copy.eigenvalue.requires_grad = False
             self.eigenfunctions.append(solution_copy)
 
+            self.approximate_solution.eigenvalue = torch.tensor([2*self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
+            self.approximate_solution.init_xavier()
+            parameters = list(self.approximate_solution.parameters()) + [self.approximate_solution.eigenvalue]
+            optimizer = optim.LBFGS(parameters,
+                            lr=float(1),
+                            max_iter=2000,
+                            max_eval=2000,
+                            history_size=200,
+                            line_search_fn="strong_wolfe",
+                            tolerance_change=1.0 * np.finfo(float).eps)
+            
         return history
 
     ################################################################################################
