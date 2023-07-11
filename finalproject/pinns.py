@@ -32,8 +32,8 @@ class Pinns:
         self.domain_extrema = self.domain_extrema.to(self.device)
         self.space_dimensions = 1.0
         self.alpha_sb = 10.0
-        self.alpha_norm = 20000.0
-        self.alpha_ortho = 200000.0
+        self.alpha_norm  = 40000.0
+        self.alpha_ortho = 10000.0
         self.alpha_drive = 200
         self.alpha_regu = 1
         self.c = 20.0
@@ -48,7 +48,7 @@ class Pinns:
             regularization_param=0.02,
             regularization_exp=2.,
             retrain_seed=42,
-            eigenvalue_init=5.0,
+            eigenvalue_init=3.5,
             device=device
         ).to(device)
 
@@ -172,20 +172,26 @@ class Pinns:
         func: torch.Tensor
     ) -> torch.Tensor:
         num_samples = func.shape[0]
-        domain = 1.0
-        for i in range(self.domain_extrema.shape[0]):
-            domain *= (self.domain_extrema[i,1] - self.domain_extrema[i,0])
-        return (torch.sum(func**2) - num_samples/domain)**2
+        norm = torch.sum(func**2)/num_samples
+        print("Norm: ",  round(norm.item(), 4))
+        return (norm - 1)**2
 
     def compute_ortho_loss(
         self: object,
         input_int: torch.Tensor,
         func: torch.Tensor
     ) -> torch.Tensor:
+        num_samples = func.shape[0]
         loss = torch.zeros(1, device=self.device)
+        func_sum_prev = torch.zeros_like(func, requires_grad=False)
         for eigenfunction in self.eigenfunctions:
-            loss += (torch.sum(func*self.compute_ansatz(input_int,eigenfunction(input_int))))**2
-        return loss
+            func_prev = self.compute_ansatz(input_int,eigenfunction(input_int))
+            ortho = torch.sum(func*func_prev)/num_samples
+            func_sum_prev += self.compute_ansatz(input_int,eigenfunction(input_int))
+            loss += (ortho)**2
+            print("Ortho: ",  round(ortho.item(), 4))
+
+        return loss + (torch.sum(func*func_sum_prev))**2
 
     def compute_loss(
         self: object,
@@ -252,6 +258,60 @@ class Pinns:
 
         return loss
 
+    def compute_loss_no_boundary(
+        self: object,
+        input_int: torch.Tensor,
+        verbose: bool = True
+    ) -> torch.Tensor:
+        """
+        Computes the residual for the harmonic oscillator eigenvalue equation
+
+        Args:
+            self (object): _description_
+            input_int (torch.Tensor): _description_
+
+        Returns:
+            torch.Tensor: _description_
+        """
+
+        # enable auto differentiation
+        input_int.requires_grad = True
+
+        func = self.compute_ansatz(input_int,self.approximate_solution(input_int))
+
+        eigenvalue = self.approximate_solution.eigenvalue
+
+        residual_pde = self.compute_pde_residual(input_int,func,eigenvalue)
+
+        loss_pde = torch.mean(abs(residual_pde)**2)
+
+        loss_norm = self.alpha_norm*self.compute_norm_loss(func)
+
+        loss_drive = self.alpha_drive*self.compute_drive_loss(eigenvalue)
+
+        loss_ortho = self.alpha_ortho*self.compute_ortho_loss(input_int,func)
+
+        loss_regu = self.alpha_regu*self.approximate_solution.regularization()
+
+        loss = torch.log10(loss_pde +
+                           loss_norm +
+                           loss_drive +
+                           loss_ortho +
+                           loss_regu)
+
+        if verbose:
+            print("Total loss: ",       round(loss.item(), 4))
+            # scale certain terms for fair comparison
+
+            print("PDE Loss: ",    round(torch.log10(loss_pde).item(), 4))
+            print("Drive Loss: ",    round(torch.log10(loss_drive).item(), 4))
+            print("Ortho Loss: ",    round(torch.log10(loss_ortho).item(), 4))
+            print("Norm Loss: ",   round(torch.log10(loss_norm).item(), 4))
+            print("Regu Loss: ",   round(torch.log10(loss_regu).item(), 4))
+            print("Eigenvalue: ",   round(eigenvalue.item(), 4))
+
+        return loss
+
 
     def fit(
             self: object,
@@ -308,6 +368,54 @@ class Pinns:
 
         return history
 
+    def fit_no_boundary(
+            self: object,
+            num_epochs: int,
+            optimizer: Optimizer,
+            verbose: str = True
+    ) -> typing.List[float]:
+        """
+        Trains the model
+
+        Args:
+            num_epochs (int): Number of epochs to train
+            optimizer (Optimizer): Which optimizer to use
+            verbose (str, optional): If additional information should be printed. Defaults to True.
+
+        Returns:
+            typing.List[float]: List of losses every epoch
+        """
+        history = []
+
+        # Loop over epochs
+        for epoch in range(num_epochs):
+            if verbose: print("################################ ", epoch, " ################################")
+
+            # Loop over batches
+            for _, (
+                    (inp_train_int, _),
+                    ) in enumerate(zip(
+                    self.training_set_int)):
+                def closure():
+
+                    verbose=True
+                    optimizer.zero_grad()
+                    loss = self.compute_loss_no_boundary(
+                                inp_train_int,
+                                verbose=verbose
+                                            )
+                    loss.backward()
+
+                    history.append(loss.item())
+                    return loss
+
+                optimizer.step(closure=closure)
+
+        print("Final Loss: ", history[-1])
+
+        return history
+
+
     def fit_multiple(
             self: object,
             num_epochs: int,
@@ -329,13 +437,19 @@ class Pinns:
 
         # Loop over eigenfunctions
         for i in range(self.num_eigenfunctions):
-            history += self.fit(num_epochs, optimizer, verbose=verbose)
+            if i == 2:
+                self.alpha_ortho *= 4
+                self.alpha_norm *= 2
+            if i == 3:
+                self.alpha_norm *= 4
+                self.alpha_ortho *= 6
+            history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
             solution_copy = common.NeuralNet(
                         input_dimension=self.domain_extrema.shape[0],
                         output_dimension=1,
                         n_hidden_layers=self.num_layer,
                         neurons=self.size_layer,
-                        regularization_param=0.1,
+                        regularization_param=0.01,
                         regularization_exp=2.,
                         retrain_seed=42,
                         eigenvalue_init=self.approximate_solution.eigenvalue.item(),
@@ -346,18 +460,16 @@ class Pinns:
                 param.requires_grad = False
             solution_copy.eigenvalue.requires_grad = False
             self.eigenfunctions.append(solution_copy)
-
             self.approximate_solution.eigenvalue = torch.tensor([2*self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
-            self.approximate_solution.init_xavier()
+            # self.approximate_solution.init_xavier()
             parameters = list(self.approximate_solution.parameters()) + [self.approximate_solution.eigenvalue]
             optimizer = optim.LBFGS(parameters,
-                            lr=float(1),
-                            max_iter=2000,
-                            max_eval=2000,
-                            history_size=200,
+                            lr=float(0.5),
+                            max_iter=50,
+                            max_eval=50,
+                            history_size=100,
                             line_search_fn="strong_wolfe",
                             tolerance_change=1.0 * np.finfo(float).eps)
-            
         return history
 
     ################################################################################################
@@ -405,7 +517,7 @@ class Pinns:
         for i,eigenfunction in enumerate(self.eigenfunctions):
             print(eigenfunction.eigenvalue.detach().item())
 
-            output = (eigenfunction(inputs)*(1-torch.exp(-(inputs-self.domain_extrema[:,0])**2))*(1-torch.exp(-(inputs-self.domain_extrema[:,1])**2)) + self.ub).detach().cpu()
+            output = self.compute_ansatz(inputs,eigenfunction(inputs)).detach().cpu()
 
             # plot both fluid and solid temperature
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)

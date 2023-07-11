@@ -52,6 +52,7 @@ class NeuralNet(nn.Module):
         self.n_hidden_layers = n_hidden_layers
         # Activation function
         self.activation = nn.Tanh()
+        # self.activation = torch.sin
         self.regularization_param = regularization_param
         # Regularization exponent
         self.regularization_exp = regularization_exp
@@ -60,6 +61,7 @@ class NeuralNet(nn.Module):
         self.eigenvalue = torch.tensor([eigenvalue_init], requires_grad=True, device=device)
 
         self.input_layer = nn.Linear(self.input_dimension + 1, self.neurons)
+        # self.input_layer = nn.Linear(self.input_dimension, self.neurons)
         self.hidden_layers = nn.ModuleList([nn.Linear(self.neurons, self.neurons)
                                             for _ in range(n_hidden_layers - 1)])
         self.output_layer = nn.Linear(self.neurons, self.output_dimension)
@@ -83,6 +85,23 @@ class NeuralNet(nn.Module):
         # the set of affine and non-linear transformations defining the network
         input_d = torch.cat((input_data, self.eigenvalue*torch.ones(input_data.shape[0], 1, device=self.device)), dim=1)
         hidden_data = self.activation(self.input_layer(input_d))
+        for _, layer in enumerate(self.hidden_layers):
+            hidden_data = self.activation(layer(hidden_data))
+        return self.output_layer(hidden_data)
+    
+    def forward_old(self,
+        input_data
+    ):
+        """Calculates the forward pass
+
+        Args:
+            input_data (_type_): Input tensor
+
+        Returns:
+            _type_: Data after forward pass
+        """
+        # The forward function performs
+        hidden_data = self.activation(self.input_layer(input_data))
         for _, layer in enumerate(self.hidden_layers):
             hidden_data = self.activation(layer(hidden_data))
         return self.output_layer(hidden_data)

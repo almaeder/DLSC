@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     # number of the different training points
     # gpu vram limit of 16GB
-    n_int = 10000
+    n_int = 100000
     n_sb = 1000
 
     # number of batches
@@ -40,18 +40,18 @@ if __name__ == "__main__":
 
 
     
-    n_epochs = 1
+    n_epochs = 2
     parameters = list(pinn.approximate_solution.parameters()) + [pinn.approximate_solution.eigenvalue]
     # parameters = list(pinn.approximate_solution.parameters())
     optimizer_LBFGS = optim.LBFGS(parameters,
-                                lr=float(1),
-                                max_iter=2000,
-                                max_eval=2000,
-                                history_size=200,
+                                lr=float(0.5),
+                                max_iter=50,
+                                max_eval=50,
+                                history_size=100,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)
     optimizer_ADAM = optim.Adam(parameters,
-                                lr=float(0.5))
+                                lr=float(0.1))
     # choose optimizer
     optimizer = optimizer_LBFGS
 
