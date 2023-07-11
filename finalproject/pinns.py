@@ -182,11 +182,10 @@ class Pinns:
         input_int: torch.Tensor,
         func: torch.Tensor
     ) -> torch.Tensor:
-        with torch.no_grad():
-            func_prev = torch.zeros_like(func, requires_grad=False)    
-            for eigenfunction in self.eigenfunctions:
-                func_prev += self.compute_ansatz(input_int,eigenfunction(input_int))
-        return (torch.sum(func*func_prev))**2
+        loss = torch.zeros(1, device=self.device)
+        for eigenfunction in self.eigenfunctions:
+            loss += (torch.sum(func*self.compute_ansatz(input_int,eigenfunction(input_int))))**2
+        return loss
 
     def compute_loss(
         self: object,
