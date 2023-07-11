@@ -38,7 +38,7 @@ class Pinns:
         self.alpha_regu = 1
         self.c = 20.0
         self.num_eigenfunctions = 4
-        self.num_layer = 3
+        self.num_layer = 5
         self.size_layer = 100
         self.approximate_solution = common.NeuralNet(
             input_dimension=self.domain_extrema.shape[0],
@@ -130,8 +130,8 @@ class Pinns:
     ) -> torch.Tensor:
         # return nn
         return (nn*
-                (1-torch.exp(-100*(input_int-self.domain_extrema[:,0])**2))*
-                (1-torch.exp(-100*(input_int-self.domain_extrema[:,1])**2)) + self.ub)
+                (1-torch.exp(-100*(input_int-self.domain_extrema[:,0])))*
+                (1-torch.exp(100*(input_int-self.domain_extrema[:,1]))) + self.ub)
     
 
 
@@ -437,12 +437,14 @@ class Pinns:
 
         # Loop over eigenfunctions
         for i in range(self.num_eigenfunctions):
+            if i == 1:
+                self.alpha_norm *= 1
             if i == 2:
-                self.alpha_ortho *= 4
-                self.alpha_norm *= 2
+                self.alpha_ortho *= 1
+                self.alpha_norm *= 1
             if i == 3:
-                self.alpha_norm *= 4
-                self.alpha_ortho *= 6
+                self.alpha_norm *= 1
+                self.alpha_ortho *= 1
             history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
             solution_copy = common.NeuralNet(
                         input_dimension=self.domain_extrema.shape[0],
@@ -521,7 +523,9 @@ class Pinns:
 
             # plot both fluid and solid temperature
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
-            axs.scatter(inputs[:, 0].detach().cpu(), output[:,0])
+            inputs = inputs[:, 0].detach().cpu().numpy()
+            axs.scatter(inputs, output[:,0])
+            axs.scatter(inputs,np.sqrt(2)*np.sin((i+1)*np.pi*inputs))
 
             # set the labels
             axs.set_xlabel("x")
