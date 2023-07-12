@@ -133,7 +133,38 @@ class Pinns:
         return (nn*
                 (1-torch.exp(-10*(input_int-self.domain_extrema[:,0])))*
                 (1-torch.exp(10*(input_int-self.domain_extrema[:,1]))) + self.ub)
-    
+
+    def compute_potential_infinite_well(
+        self: object,
+        input_int: torch.Tensor
+    ) -> torch.Tensor:
+        return torch.zeros_like(input_int)
+
+    def compute_potential_double_well(
+        self: object,
+        input_int: torch.Tensor
+    ) -> torch.Tensor:
+        pos_s = 0.4
+        pos_e = 0.6
+        return 200*torch.logical_and((pos_s <= input_int),(pos_e >= input_int))
+
+
+    def compute_potential_rtd(
+        self: object,
+        input_int: torch.Tensor
+    ) -> torch.Tensor:
+        pos_ls = 0.3
+        pos_le = 0.4
+        pos_rs = 0.6
+        pos_re = 0.7
+        return 100*torch.logical_or( torch.logical_and((pos_ls <= input_int),(pos_le >= input_int)),
+                torch.logical_and((pos_rs <= input_int),(pos_re >= input_int))).double()
+
+    def compute_potential(
+        self: object,
+        input_int: torch.Tensor
+    ) -> torch.Tensor:
+        return self.compute_potential_infinite_well(input_int)
 
 
     def compute_pde_residual(
@@ -156,7 +187,8 @@ class Pinns:
 
         grad_func_xx = torch.autograd.grad(grad_func.sum(), input_int, create_graph=True)[0][:, 0]
 
-        residual_pde = grad_func_xx + torch.squeeze(eigenvalue**2 * func)
+        potential = self.compute_potential(input_int)
+        residual_pde = grad_func_xx + torch.squeeze((eigenvalue**2 - potential) * func)
 
         # for i in range(self.num_eigenfunctions):
 
@@ -552,6 +584,7 @@ class Pinns:
         inputs = self.convert(inputs)
         inputs = inputs.to(self.device)
         inputss = inputs[:, 0].detach().cpu().numpy()
+        potential = self.compute_potential(inputs).detach().cpu().numpy()
         for i,eigenfunction in enumerate(self.eigenfunctions):
             print(eigenfunction.eigenvalue.detach().item())
 
@@ -559,9 +592,10 @@ class Pinns:
 
             # plot both fluid and solid temperature
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
-            
             axs.scatter(inputss, output[:,0])
+            # axs.scatter(inputss, output[:,0] + eigenfunction.eigenvalue.detach().item()**2)
             axs.scatter(inputss,-np.sqrt(2)*np.sin((i+1)*np.pi*inputss))
+            # axs.scatter(inputss, potential)
 
             # set the labels
             axs.set_xlabel("x")
