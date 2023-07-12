@@ -7,6 +7,7 @@ import common
 import typing
 import matplotlib.pyplot as plt
 import copy
+import math
 class Pinns:
     """
     Class to create pinns for the thermal storage equation of task2.
@@ -151,11 +152,22 @@ class Pinns:
         # and dsum_u/dxi = d(u1 + u2 + u3 + u4 + ... + un)/dxi = d(u(x1) + u(x2) u3(x3) + u4(x4) + ... + u(xn))/dxi = dui/dxi
         grad_func = torch.autograd.grad(func.sum(), input_int, create_graph=True)[0]
 
-        grad_func_x = grad_func[:, 0]
+        # grad_func_x = grad_func[:, 0]
 
-        grad_func_xx = torch.autograd.grad(grad_func_x.sum(), input_int, create_graph=True)[0][:, 0]
+        grad_func_xx = torch.autograd.grad(grad_func.sum(), input_int, create_graph=True)[0][:, 0]
 
-        residual_pde = grad_func_xx + eigenvalue**2 * func
+        residual_pde = grad_func_xx + torch.squeeze(eigenvalue**2 * func)
+
+        # gold_solution = torch.sqrt(torch.tensor(2.0))*torch.sin(torch.tensor(math.pi)*input_int)
+
+        # grad_gold = torch.autograd.grad(gold_solution.sum(), input_int, create_graph=True)[0]
+
+        # grad_gold_x = grad_gold[:, 0]
+
+        # grad_gold_xx = torch.autograd.grad(grad_gold_x.sum(), input_int, create_graph=True)[0][:, 0]
+
+        # residual_pde_gold = grad_gold_xx + torch.squeeze((torch.tensor(math.pi))**2 * gold_solution)
+        # loss_gold = torch.sum(residual_pde_gold)
 
         return residual_pde
 
@@ -443,11 +455,11 @@ class Pinns:
                 self.alpha_ortho *= 2
                 self.alpha_norm *= 10
             if i == 2:
-                self.approximate_solution.init_xavier()
+                # self.approximate_solution.init_xavier()
                 self.alpha_ortho *= 20
-                self.alpha_norm *= 4
+                self.alpha_norm *= 20
             if i == 3:
-                self.alpha_ortho *= 2
+                self.alpha_ortho *= 10
                 self.alpha_norm *= 2
 
             history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
