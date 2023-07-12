@@ -66,8 +66,8 @@ class Pinns:
         self.approximate_solution = common.NeuralNet(
             input_dimension=self.domain_extrema.shape[0], # x and t
             output_dimension=2, # T_f and T_s
-            n_hidden_layers=5,
-            neurons=100,
+            n_hidden_layers=2,
+            neurons=10,
             regularization_param=0.,
             regularization_exp=2.,
             retrain_seed=42

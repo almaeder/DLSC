@@ -74,8 +74,8 @@ if __name__ == "__main__":
     # number of the different training points
     # gpu vram limit of 8GB
     # given amount of measurement points: 39200
-    n_int = 10000 # 256
-    n_sb_tb = 1000 # 64
+    n_int = 4000 # 256
+    n_sb_tb = 400 # 64
     n_meas = 39200
     n_sb = n_sb_tb
     n_tb = n_sb_tb
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     n_epochs = 1
     optimizer_LBFGS = optim.LBFGS(pinn.approximate_solution.parameters(),
                                 lr=float(0.5),
-                                max_iter=2000,
+                                max_iter=10000,
                                 max_eval=2000,
                                 history_size=100,
                                 line_search_fn="strong_wolfe",

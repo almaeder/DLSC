@@ -76,7 +76,7 @@ class Pinns:
             input_dimension=self.domain_extrema.shape[0], # x and t
             output_dimension=2, # T_f and T_s
             n_hidden_layers=5,
-            neurons=100,
+            neurons=85,
             regularization_param=0.1,
             regularization_exp=2.,
             retrain_seed=42
@@ -155,8 +155,9 @@ class Pinns:
         Returns:
             torch.Tensor: Output tensor
         """
-        mask_charge = torch.logical_or(torch.logical_and(time >= 0, time < 1),
-                                       torch.logical_and(time >= 4, time < 5))
+        # mask_charge = torch.logical_or(torch.logical_and(time >= 0, time < 1),
+        #                                torch.logical_and(time >= 4, time < 5))
+        mask_charge = (time.ge(0) * time.lt(1)) + (time.ge(4) * time.lt(5))
         return mask_charge
 
     def masking_discharge(
@@ -172,8 +173,10 @@ class Pinns:
         Returns:
             torch.Tensor: Output tensor
         """
-        mask_discharge = torch.logical_or(torch.logical_and(time >= 2, time < 3),
-                                          torch.logical_and(time >= 6, time < 7))
+        # mask_discharge = torch.logical_or(torch.logical_and(time >= 2, time < 3),
+        #                                   torch.logical_and(time >= 6, time < 7))
+        mask_discharge = (time.ge(2) * time.lt(3)) + (time.ge(6) * time.lt(7))
+        #mask_discharge = ((time >= 2 + time < 3) == 1) + ((time >= 6 + time < 7) == 1) > 0
         return mask_discharge
 
     def masking_idle(
@@ -189,10 +192,11 @@ class Pinns:
         Returns:
             torch.Tensor: Output tensor
         """
-        mask_idle = torch.logical_or(torch.logical_or(torch.logical_and(time >= 1, time < 2),
-                                                      torch.logical_and(time >= 3, time < 4)),
-                                     torch.logical_or(torch.logical_and(time >= 5, time < 6),
-                                                      torch.logical_and(time >= 7, time <= 8)))
+        mask_idle = (time.ge(1) * time.lt(2)) + (time.ge(3) * time.lt(4)) + (time.ge(5) * time.lt(6)) + (time.ge(7) * time.le(8))
+        # mask_idle = torch.logical_or(torch.logical_or(torch.logical_and(time >= 1, time < 2),
+        #                                               torch.logical_and(time >= 3, time < 4)),
+        #                              torch.logical_or(torch.logical_and(time >= 5, time < 6),
+        #                                               torch.logical_and(time >= 7, time <= 8)))
         return mask_idle
 
     def fluid_velocity(

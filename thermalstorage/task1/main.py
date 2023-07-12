@@ -73,8 +73,8 @@ if __name__ == "__main__":
 
     # number of the different training points
     # gpu vram limit of 16GB
-    n_int = 120000 # 256
-    n_sb_tb = 12000 # 64
+    n_int = 12000 # 256
+    n_sb_tb = 1200 # 64
     n_sb = n_sb_tb
     n_tb = n_sb_tb
     # batch sizes
