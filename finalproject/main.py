@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # number of the different training points
     # gpu vram limit of 16GB
     n_int = 100000
-    n_sb = 1000
+    n_sb = 10000
 
     # number of batches
     nb_int = 100
@@ -45,8 +45,8 @@ if __name__ == "__main__":
     # parameters = list(pinn.approximate_solution.parameters())
     optimizer_LBFGS = optim.LBFGS(parameters,
                                 lr=float(0.5),
-                                max_iter=50,
-                                max_eval=50,
+                                max_iter=20,
+                                max_eval=20,
                                 history_size=100,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)

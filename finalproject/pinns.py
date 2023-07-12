@@ -32,9 +32,9 @@ class Pinns:
         self.domain_extrema = self.domain_extrema.to(self.device)
         self.space_dimensions = 1.0
         self.alpha_sb = 10.0
-        self.alpha_norm  = 40000.0
-        self.alpha_ortho = 10000.0
-        self.alpha_drive = 200
+        self.alpha_norm  = 4000.0
+        self.alpha_ortho = 1000.0
+        self.alpha_drive = 2000
         self.alpha_regu = 1
         self.c = 20.0
         self.num_eigenfunctions = 4
@@ -434,17 +434,25 @@ class Pinns:
             typing.List[float]: List of losses every epoch
         """
         history = []
-
+        max_iter = 20
+        max_eval = 20
+        lr = 0.5
         # Loop over eigenfunctions
         for i in range(self.num_eigenfunctions):
             if i == 1:
-                self.alpha_norm *= 1
+                self.alpha_ortho *= 1
+                self.alpha_norm *= 400
             if i == 2:
-                self.alpha_ortho *= 1
-                self.alpha_norm *= 1
+                max_iter = 30
+                max_eval = 30
+                num_epochs = 3
+                self.alpha_ortho *= 4000
+                self.alpha_norm *= 20
             if i == 3:
-                self.alpha_norm *= 1
+                lr = 0.1
                 self.alpha_ortho *= 1
+                self.alpha_norm *= 1
+
             history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
             solution_copy = common.NeuralNet(
                         input_dimension=self.domain_extrema.shape[0],
@@ -463,12 +471,12 @@ class Pinns:
             solution_copy.eigenvalue.requires_grad = False
             self.eigenfunctions.append(solution_copy)
             self.approximate_solution.eigenvalue = torch.tensor([2*self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
-            # self.approximate_solution.init_xavier()
+            self.approximate_solution.init_xavier()
             parameters = list(self.approximate_solution.parameters()) + [self.approximate_solution.eigenvalue]
             optimizer = optim.LBFGS(parameters,
-                            lr=float(0.5),
-                            max_iter=50,
-                            max_eval=50,
+                            lr=float(lr),
+                            max_iter=max_iter,
+                            max_eval=max_eval,
                             history_size=100,
                             line_search_fn="strong_wolfe",
                             tolerance_change=1.0 * np.finfo(float).eps)
@@ -516,6 +524,7 @@ class Pinns:
         inputs = self.soboleng.draw(100)
         inputs = self.convert(inputs)
         inputs = inputs.to(self.device)
+        inputss = inputs[:, 0].detach().cpu().numpy()
         for i,eigenfunction in enumerate(self.eigenfunctions):
             print(eigenfunction.eigenvalue.detach().item())
 
@@ -523,9 +532,9 @@ class Pinns:
 
             # plot both fluid and solid temperature
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
-            inputs = inputs[:, 0].detach().cpu().numpy()
-            axs.scatter(inputs, output[:,0])
-            axs.scatter(inputs,np.sqrt(2)*np.sin((i+1)*np.pi*inputs))
+            
+            axs.scatter(inputss, output[:,0])
+            axs.scatter(inputss,np.sqrt(2)*np.sin((i+1)*np.pi*inputss))
 
             # set the labels
             axs.set_xlabel("x")
