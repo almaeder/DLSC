@@ -45,8 +45,8 @@ if __name__ == "__main__":
     # parameters = list(pinn.approximate_solution.parameters())
     optimizer_LBFGS = optim.LBFGS(parameters,
                                 lr=float(0.5),
-                                max_iter=20,
-                                max_eval=20,
+                                max_iter=50,
+                                max_eval=50,
                                 history_size=100,
                                 line_search_fn="strong_wolfe",
                                 tolerance_change=1.0 * np.finfo(float).eps)

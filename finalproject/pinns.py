@@ -39,8 +39,8 @@ class Pinns:
         self.alpha_regu = 1
         self.c = 20.0
         self.num_eigenfunctions = 4
-        self.num_layer = 2
-        self.size_layer = 20
+        self.num_layer = 3
+        self.size_layer = 40
         self.approximate_solution = common.NeuralNet(
             input_dimension=self.domain_extrema.shape[0],
             output_dimension=1,
@@ -158,16 +158,19 @@ class Pinns:
 
         residual_pde = grad_func_xx + torch.squeeze(eigenvalue**2 * func)
 
-        # gold_solution = torch.sqrt(torch.tensor(2.0))*torch.sin(torch.tensor(math.pi)*input_int)
+        # for i in range(self.num_eigenfunctions):
 
-        # grad_gold = torch.autograd.grad(gold_solution.sum(), input_int, create_graph=True)[0]
+        #     gold_solution = torch.sqrt(torch.tensor(2.0))*torch.sin(torch.tensor((i+1) * math.pi)*input_int)
 
-        # grad_gold_x = grad_gold[:, 0]
+        #     grad_gold = torch.autograd.grad(gold_solution.sum(), input_int, create_graph=True)[0]
 
-        # grad_gold_xx = torch.autograd.grad(grad_gold_x.sum(), input_int, create_graph=True)[0][:, 0]
+        #     grad_gold_x = grad_gold[:, 0]
 
-        # residual_pde_gold = grad_gold_xx + torch.squeeze((torch.tensor(math.pi))**2 * gold_solution)
-        # loss_gold = torch.sum(residual_pde_gold)
+        #     grad_gold_xx = torch.autograd.grad(grad_gold_x.sum(), input_int, create_graph=True)[0][:, 0]
+
+        #     residual_pde_gold = grad_gold_xx + torch.squeeze((torch.tensor((i+1) * math.pi))**2 * gold_solution)
+
+        #     print("Ideal Loss: ",    round(torch.log10(torch.mean(abs(residual_pde_gold)**2)).item(), 4))
 
         return residual_pde
 
@@ -195,14 +198,22 @@ class Pinns:
     ) -> torch.Tensor:
         num_samples = func.shape[0]
         loss = torch.zeros(1, device=self.device)
+        loss_gold = torch.zeros(1, device=self.device)
         func_sum_prev = torch.zeros_like(func, requires_grad=False)
+        #func_gold = torch.sqrt(torch.tensor(2.0))*torch.sin(torch.tensor(3 * math.pi)*input_int)
         for eigenfunction in self.eigenfunctions:
             func_prev = self.compute_ansatz(input_int,eigenfunction(input_int))
             ortho = torch.sum(func*func_prev)/num_samples
-            func_sum_prev += self.compute_ansatz(input_int,eigenfunction(input_int))
+            #ortho_gold = torch.sum(func_gold*func_prev)/num_samples
+            func_sum_prev += self.compute_ansatz(input_int,eigenfunction(input_int))/num_samples
             loss += (ortho)**2
-            print("Ortho: ",  round(ortho.item(), 4))
+            #loss_gold += (ortho_gold)**2
+            #print("Ortho: ",  round(ortho.item(), 4))
+            #print("Ortho Gold: ",  round(ortho_gold.item(), 4))
 
+        #loss_ortho = self.alpha_ortho*(loss_gold + (torch.sum(func_gold*func_sum_prev))**2)
+        #loss_ortho = self.alpha_ortho*(loss_gold)
+        #print("Ortho Gold Loss: ",    round(torch.log10(loss_ortho).item(), 4))
         return loss + (torch.sum(func*func_sum_prev))**2
 
     def compute_loss(
@@ -452,13 +463,20 @@ class Pinns:
         # Loop over eigenfunctions
         for i in range(self.num_eigenfunctions):
             if i == 1:
+                max_iter *=2
+                max_eval *=2
                 self.alpha_ortho *= 2
                 self.alpha_norm *= 10
             if i == 2:
-                # self.approximate_solution.init_xavier()
+                max_iter *=2
+                max_eval *=2
+                self.approximate_solution.init_xavier()
                 self.alpha_ortho *= 20
                 self.alpha_norm *= 20
             if i == 3:
+                max_iter *=2
+                max_eval *=2
+                self.approximate_solution.init_xavier()
                 self.alpha_ortho *= 10
                 self.alpha_norm *= 2
 
@@ -479,7 +497,7 @@ class Pinns:
                 param.requires_grad = False
             solution_copy.eigenvalue.requires_grad = False
             self.eigenfunctions.append(solution_copy)
-            self.approximate_solution.eigenvalue = torch.tensor([2*self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
+            self.approximate_solution.eigenvalue = torch.tensor([self.eigenfunctions[0].eigenvalue + self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
             # self.approximate_solution.init_xavier()
             parameters = list(self.approximate_solution.parameters()) + [self.approximate_solution.eigenvalue]
             optimizer = optim.LBFGS(parameters,
