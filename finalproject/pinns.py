@@ -34,12 +34,12 @@ class Pinns:
         self.alpha_sb = 10.0
         self.alpha_norm  = 4000.0
         self.alpha_ortho = 1000.0
-        self.alpha_drive = 2000
+        self.alpha_drive = 200
         self.alpha_regu = 1
         self.c = 20.0
         self.num_eigenfunctions = 4
-        self.num_layer = 5
-        self.size_layer = 100
+        self.num_layer = 2
+        self.size_layer = 20
         self.approximate_solution = common.NeuralNet(
             input_dimension=self.domain_extrema.shape[0],
             output_dimension=1,
@@ -130,8 +130,8 @@ class Pinns:
     ) -> torch.Tensor:
         # return nn
         return (nn*
-                (1-torch.exp(-100*(input_int-self.domain_extrema[:,0])))*
-                (1-torch.exp(100*(input_int-self.domain_extrema[:,1]))) + self.ub)
+                (1-torch.exp(-10*(input_int-self.domain_extrema[:,0])))*
+                (1-torch.exp(10*(input_int-self.domain_extrema[:,1]))) + self.ub)
     
 
 
@@ -440,18 +440,15 @@ class Pinns:
         # Loop over eigenfunctions
         for i in range(self.num_eigenfunctions):
             if i == 1:
-                self.alpha_ortho *= 1
-                self.alpha_norm *= 400
+                self.alpha_ortho *= 2
+                self.alpha_norm *= 10
             if i == 2:
-                max_iter = 30
-                max_eval = 30
-                num_epochs = 3
-                self.alpha_ortho *= 4000
-                self.alpha_norm *= 20
+                self.approximate_solution.init_xavier()
+                self.alpha_ortho *= 20
+                self.alpha_norm *= 4
             if i == 3:
-                lr = 0.1
-                self.alpha_ortho *= 1
-                self.alpha_norm *= 1
+                self.alpha_ortho *= 2
+                self.alpha_norm *= 2
 
             history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
             solution_copy = common.NeuralNet(
@@ -471,7 +468,7 @@ class Pinns:
             solution_copy.eigenvalue.requires_grad = False
             self.eigenfunctions.append(solution_copy)
             self.approximate_solution.eigenvalue = torch.tensor([2*self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
-            self.approximate_solution.init_xavier()
+            # self.approximate_solution.init_xavier()
             parameters = list(self.approximate_solution.parameters()) + [self.approximate_solution.eigenvalue]
             optimizer = optim.LBFGS(parameters,
                             lr=float(lr),
@@ -534,7 +531,7 @@ class Pinns:
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
             
             axs.scatter(inputss, output[:,0])
-            axs.scatter(inputss,np.sqrt(2)*np.sin((i+1)*np.pi*inputss))
+            axs.scatter(inputss,-np.sqrt(2)*np.sin((i+1)*np.pi*inputss))
 
             # set the labels
             axs.set_xlabel("x")

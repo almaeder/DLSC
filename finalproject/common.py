@@ -51,8 +51,8 @@ class NeuralNet(nn.Module):
         # Number of hidden layers
         self.n_hidden_layers = n_hidden_layers
         # Activation function
-        self.activation = nn.Tanh()
-        # self.activation = torch.sin
+        # self.activation = nn.Tanh()
+        self.activation = torch.sin
         self.regularization_param = regularization_param
         # Regularization exponent
         self.regularization_exp = regularization_exp
