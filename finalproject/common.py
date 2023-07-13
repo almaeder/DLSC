@@ -141,14 +141,14 @@ def compute_potential_double_well(
 def compute_potential_rtd(
     input_int: torch.Tensor
 ) -> torch.Tensor:
-    pos_ls = 0.3
-    pos_le = 0.4
-    pos_rs = 0.6
-    pos_re = 0.7
-    return 100*torch.logical_or( torch.logical_and((pos_ls <= input_int),(pos_le >= input_int)),
+    pos_ls = 1.9
+    pos_le = 2.25
+    pos_rs = 2.75
+    pos_re = 3.1
+    return 30*torch.logical_or( torch.logical_and((pos_ls <= input_int),(pos_le >= input_int)),
             torch.logical_and((pos_rs <= input_int),(pos_re >= input_int))).double()
 
 def compute_potential(
     input_int: torch.Tensor
 ) -> torch.Tensor:
-    return compute_potential_infinite_well(input_int)
+    return compute_potential_rtd(input_int)

@@ -21,6 +21,7 @@ class Pinns:
         xl: float,
         xr: float,
         ub: float,
+        num_eigenfunctions: int,
         device: torch.device
     ):
         self.device = device
@@ -38,7 +39,7 @@ class Pinns:
         self.alpha_drive = 200
         self.alpha_regu = 1
         self.c = 20.0
-        self.num_eigenfunctions = 4
+        self.num_eigenfunctions = num_eigenfunctions
         self.num_layer = 3
         self.size_layer = 40
         self.approximate_solution = common.NeuralNet(

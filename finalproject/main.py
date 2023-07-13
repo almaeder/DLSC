@@ -10,6 +10,7 @@ parent_path = os.path.abspath(os.path.join(main_path, ".."))
 sys.path.append(parent_path)
 
 from finalproject import pinns
+from finalproject import fd
 
 torch.autograd.set_detect_anomaly(False)
 torch.manual_seed(128)
@@ -34,12 +35,16 @@ if __name__ == "__main__":
     batchsize_int = n_int // nb_int
     batchsize_sb = n_sb // nb_sb
     xl = 0.0
-    xr = 1.0
+    xr = 5.0
     ub = 0.0
-    pinn = pinns.Pinns(n_int, n_sb, batchsize_int, batchsize_sb, xl, xr, ub, device)
+    num_eig = 5
+    pinn = pinns.Pinns(n_int, n_sb, batchsize_int, batchsize_sb, xl, xr, ub, num_eig, device)
 
+    solver = fd.FD_solver(xl, xr, 5000)
+    solver.assemble()
+    solver.eigensolve(num_eig=num_eig)
+    solver.plot(num_eig=num_eig)
 
-    
     n_epochs = 2
     parameters = list(pinn.approximate_solution.parameters()) + [pinn.approximate_solution.eigenvalue]
     # parameters = list(pinn.approximate_solution.parameters())
