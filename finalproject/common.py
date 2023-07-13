@@ -124,3 +124,31 @@ class NeuralNet(nn.Module):
             if 'weight' in name:
                 reg_loss = reg_loss + torch.norm(param, self.regularization_exp)
         return self.regularization_param * reg_loss
+
+def compute_potential_infinite_well(
+    input_int: torch.Tensor
+) -> torch.Tensor:
+    return torch.zeros_like(input_int)
+
+def compute_potential_double_well(
+    input_int: torch.Tensor
+) -> torch.Tensor:
+    pos_s = 0.4
+    pos_e = 0.6
+    return 200*torch.logical_and((pos_s <= input_int),(pos_e >= input_int))
+
+
+def compute_potential_rtd(
+    input_int: torch.Tensor
+) -> torch.Tensor:
+    pos_ls = 0.3
+    pos_le = 0.4
+    pos_rs = 0.6
+    pos_re = 0.7
+    return 100*torch.logical_or( torch.logical_and((pos_ls <= input_int),(pos_le >= input_int)),
+            torch.logical_and((pos_rs <= input_int),(pos_re >= input_int))).double()
+
+def compute_potential(
+    input_int: torch.Tensor
+) -> torch.Tensor:
+    return compute_potential_infinite_well(input_int)

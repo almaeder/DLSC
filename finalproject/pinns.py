@@ -134,39 +134,6 @@ class Pinns:
                 (1-torch.exp(-10*(input_int-self.domain_extrema[:,0])))*
                 (1-torch.exp(10*(input_int-self.domain_extrema[:,1]))) + self.ub)
 
-    def compute_potential_infinite_well(
-        self: object,
-        input_int: torch.Tensor
-    ) -> torch.Tensor:
-        return torch.zeros_like(input_int)
-
-    def compute_potential_double_well(
-        self: object,
-        input_int: torch.Tensor
-    ) -> torch.Tensor:
-        pos_s = 0.4
-        pos_e = 0.6
-        return 200*torch.logical_and((pos_s <= input_int),(pos_e >= input_int))
-
-
-    def compute_potential_rtd(
-        self: object,
-        input_int: torch.Tensor
-    ) -> torch.Tensor:
-        pos_ls = 0.3
-        pos_le = 0.4
-        pos_rs = 0.6
-        pos_re = 0.7
-        return 100*torch.logical_or( torch.logical_and((pos_ls <= input_int),(pos_le >= input_int)),
-                torch.logical_and((pos_rs <= input_int),(pos_re >= input_int))).double()
-
-    def compute_potential(
-        self: object,
-        input_int: torch.Tensor
-    ) -> torch.Tensor:
-        return self.compute_potential_infinite_well(input_int)
-
-
     def compute_pde_residual(
         self: object,
         input_int: torch.Tensor,
@@ -187,7 +154,7 @@ class Pinns:
 
         grad_func_xx = torch.autograd.grad(grad_func.sum(), input_int, create_graph=True)[0][:, 0]
 
-        potential = self.compute_potential(input_int)
+        potential = common.compute_potential(input_int)
         residual_pde = grad_func_xx + torch.squeeze((eigenvalue**2 - potential) * func)
 
         # for i in range(self.num_eigenfunctions):
