@@ -8,6 +8,7 @@ import typing
 import matplotlib.pyplot as plt
 import copy
 import math
+import torch.nn as nn
 class Pinns:
     """
     Class to create pinns for the thermal storage equation of task2.
@@ -22,6 +23,7 @@ class Pinns:
         xr: float,
         ub: float,
         num_eigenfunctions: int,
+        max_value: float,
         device: torch.device
     ):
         self.device = device
@@ -38,7 +40,7 @@ class Pinns:
         self.alpha_ortho = 1000.0
         self.alpha_drive = 200
         self.alpha_regu = 1
-        self.c = 20.0
+        self.max_value = max_value
         self.num_eigenfunctions = num_eigenfunctions
         self.num_layer = 3
         self.size_layer = 40
@@ -125,6 +127,41 @@ class Pinns:
 
         return training_set_int, training_set_sbl, training_set_sbr
 
+    def save_eigenfunctions(
+        self: object,
+        path: str
+    ):
+        for i,eigenfunction in enumerate(self.eigenfunctions):
+            torch.save({"model_state_dict": eigenfunction.state_dict()
+            },
+            path + "einfunction_" + str(i) + ".pt")
+
+    def load_eigenfunctions(
+        self: object,
+        path: str,
+        num: int
+    ):
+        for i in range(num):
+            checkpoint = torch.load(path + "einfunction_" + str(i) + ".pt", map_location=self.device)
+            eigenfunction = common.NeuralNet(
+                        input_dimension=self.domain_extrema.shape[0],
+                        output_dimension=1,
+                        n_hidden_layers=self.num_layer,
+                        neurons=self.size_layer,
+                        regularization_param=0.01,
+                        regularization_exp=2.,
+                        retrain_seed=42,
+                        eigenvalue_init=self.approximate_solution.eigenvalue.item(),
+                        device=self.device
+                    )
+            eigenfunction.load_state_dict(checkpoint["model_state_dict"])
+            eigenfunction.to(self.device)
+            for param in eigenfunction.parameters():
+                param.requires_grad = False
+            eigenfunction.eigenvalue.requires_grad = False
+            self.eigenfunctions.append(eigenfunction)
+        self.num_eigenfunctions = self.num_eigenfunctions - num
+
     def compute_ansatz(
         self: object,
         input_int: torch.Tensor,
@@ -180,7 +217,7 @@ class Pinns:
         eigenvalue: torch.Tensor
     ) -> torch.Tensor:
         # lower and upper limit for eigenvalue
-        return torch.exp(10*(-self.c + eigenvalue)) + torch.exp(-10*eigenvalue)
+        return torch.exp(10*(-self.max_value + eigenvalue)) + torch.exp(-10*eigenvalue)
 
     def compute_norm_loss(
         self: object,
@@ -208,7 +245,7 @@ class Pinns:
             func_sum_prev += self.compute_ansatz(input_int,eigenfunction(input_int))/num_samples
             loss += (ortho)**2
             #loss_gold += (ortho_gold)**2
-            #print("Ortho: ",  round(ortho.item(), 4))
+            print("Ortho: ",  round(ortho.item(), 4))
             #print("Ortho Gold: ",  round(ortho_gold.item(), 4))
 
         #loss_ortho = self.alpha_ortho*(loss_gold + (torch.sum(func_gold*func_sum_prev))**2)
@@ -286,16 +323,6 @@ class Pinns:
         input_int: torch.Tensor,
         verbose: bool = True
     ) -> torch.Tensor:
-        """
-        Computes the residual for the harmonic oscillator eigenvalue equation
-
-        Args:
-            self (object): _description_
-            input_int (torch.Tensor): _description_
-
-        Returns:
-            torch.Tensor: _description_
-        """
 
         # enable auto differentiation
         input_int.requires_grad = True
@@ -342,24 +369,11 @@ class Pinns:
             optimizer: Optimizer,
             verbose: str = True
     ) -> typing.List[float]:
-        """
-        Trains the model
-
-        Args:
-            num_epochs (int): Number of epochs to train
-            optimizer (Optimizer): Which optimizer to use
-            verbose (str, optional): If additional information should be printed. Defaults to True.
-
-        Returns:
-            typing.List[float]: List of losses every epoch
-        """
         history = []
 
-        # Loop over epochs
         for epoch in range(num_epochs):
             if verbose: print("################################ ", epoch, " ################################")
 
-            # Loop over batches
             for _, (
                     (inp_train_int, _),
                     (inp_train_sbl, out_train_sbl),
@@ -397,24 +411,12 @@ class Pinns:
             optimizer: Optimizer,
             verbose: str = True
     ) -> typing.List[float]:
-        """
-        Trains the model
 
-        Args:
-            num_epochs (int): Number of epochs to train
-            optimizer (Optimizer): Which optimizer to use
-            verbose (str, optional): If additional information should be printed. Defaults to True.
-
-        Returns:
-            typing.List[float]: List of losses every epoch
-        """
         history = []
 
-        # Loop over epochs
         for epoch in range(num_epochs):
             if verbose: print("################################ ", epoch, " ################################")
 
-            # Loop over batches
             for _, (
                     (inp_train_int, _),
                     ) in enumerate(zip(
@@ -445,42 +447,33 @@ class Pinns:
             optimizer: Optimizer,
             verbose: str = True
     ) -> typing.List[float]:
-        """
-        Trains the model
 
-        Args:
-            num_epochs (int): Number of epochs to train
-            optimizer (Optimizer): Which optimizer to use
-            verbose (str, optional): If additional information should be printed. Defaults to True.
-
-        Returns:
-            typing.List[float]: List of losses every epoch
-        """
         history = []
         max_iter = 20
         max_eval = 20
         lr = 0.5
-        # Loop over eigenfunctions
-        for i in range(self.num_eigenfunctions):
+
+        for i in range(len(self.eigenfunctions),self.num_eigenfunctions + len(self.eigenfunctions)):
             if i == 1:
-                max_iter *=2
-                max_eval *=2
-                self.alpha_ortho *= 2
-                self.alpha_norm *= 10
+                max_iter *=1
+                max_eval *=1
+                self.alpha_ortho *= 1
+                self.alpha_norm *= 1
             if i == 2:
-                max_iter *=2
-                max_eval *=2
+                max_iter *=1
+                max_eval *=1
                 self.approximate_solution.init_xavier()
-                self.alpha_ortho *= 20
-                self.alpha_norm *= 20
+                self.alpha_ortho *= 1
+                self.alpha_norm *= 1
             if i == 3:
-                max_iter *=2
-                max_eval *=2
+                max_iter *=1
+                max_eval *=1
                 self.approximate_solution.init_xavier()
-                self.alpha_ortho *= 10
+                self.alpha_ortho *= 2
                 self.alpha_norm *= 2
 
             history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
+
             solution_copy = common.NeuralNet(
                         input_dimension=self.domain_extrema.shape[0],
                         output_dimension=1,
@@ -492,14 +485,15 @@ class Pinns:
                         eigenvalue_init=self.approximate_solution.eigenvalue.item(),
                         device=self.device
                     ).to(self.device)
+
             solution_copy.load_state_dict(copy.deepcopy(self.approximate_solution.state_dict()))
             for param in solution_copy.parameters():
                 param.requires_grad = False
             solution_copy.eigenvalue.requires_grad = False
             self.eigenfunctions.append(solution_copy)
-            self.approximate_solution.eigenvalue = torch.tensor([self.eigenfunctions[0].eigenvalue + self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device)
-            # self.approximate_solution.init_xavier()
-            parameters = list(self.approximate_solution.parameters()) + [self.approximate_solution.eigenvalue]
+            self.approximate_solution.eigenvalue = nn.Parameter(torch.tensor([self.eigenfunctions[0].eigenvalue + self.approximate_solution.eigenvalue[:]], requires_grad=True, device=self.device))
+
+            parameters = list(self.approximate_solution.parameters())
             optimizer = optim.LBFGS(parameters,
                             lr=float(lr),
                             max_iter=max_iter,
@@ -514,23 +508,15 @@ class Pinns:
         self: object,
         name: str = "plot.png"
     ):
-        """
-        Plot the learned fluid and solid temperature
-
-        Args:
-            name (str, optional): Name of the plot. Defaults to "plot.png".
-        """
         inputs = self.soboleng.draw(100)
         inputs = self.convert(inputs)
         inputs = inputs.to(self.device)
         
         output = self.compute_ansatz(inputs,self.approximate_solution(inputs)).detach().cpu()
 
-        # plot both fluid and solid temperature
         fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
         axs.scatter(inputs[:, 0].detach().cpu(), output[:,0])
 
-        # set the labels
         axs.set_xlabel("x")
         axs.set_ylabel("u")
         axs.grid(True, which="both", ls=":")
@@ -542,19 +528,13 @@ class Pinns:
         self: object,
         name: str = "plot"
     ):
-        """
-        Plot the learned fluid and solid temperature
-
-        Args:
-            name (str, optional): Name of the plot. Defaults to "plot.png".
-        """
-        inputs = self.soboleng.draw(100)
+        inputs = self.soboleng.draw(1000)
         inputs = self.convert(inputs)
         inputs = inputs.to(self.device)
         inputss = inputs[:, 0].detach().cpu().numpy()
-        potential = self.compute_potential(inputs).detach().cpu().numpy()
+
         for i,eigenfunction in enumerate(self.eigenfunctions):
-            print(eigenfunction.eigenvalue.detach().item())
+            print(eigenfunction.eigenvalue.detach().item(), eigenfunction.eigenvalue.detach().item()**2)
 
             output = self.compute_ansatz(inputs,eigenfunction(inputs)).detach().cpu()
 
@@ -562,12 +542,32 @@ class Pinns:
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
             axs.scatter(inputss, output[:,0])
             # axs.scatter(inputss, output[:,0] + eigenfunction.eigenvalue.detach().item()**2)
-            axs.scatter(inputss,-np.sqrt(2)*np.sin((i+1)*np.pi*inputss))
-            # axs.scatter(inputss, potential)
+            # axs.scatter(inputss,-np.sqrt(2)*np.sin((i+1)*np.pi*inputss))
 
-            # set the labels
             axs.set_xlabel("x")
             axs.set_ylabel("u")
             axs.grid(True, which="both", ls=":")
 
             fig.savefig(name + "_" + str(i) + ".png")
+    
+    def plotting_prob_amplitude_fd(
+        self: object,
+        mode: int,
+        grid_fd,
+        solution_fd,
+        name: str = "plot"
+    ):
+        num_samples = 1000
+        inputs = self.soboleng.draw(num_samples)
+        inputs = self.convert(inputs)
+        inputs = inputs.to(self.device)
+        inputss = inputs[:, 0].detach().cpu().numpy()
+        output = self.compute_ansatz(inputs,self.eigenfunctions[mode](inputs)).detach().cpu()**2/num_samples
+        fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
+        axs.scatter(inputss, output[:,0], label="NN")
+        axs.scatter(grid_fd, solution_fd**2, label="FD")
+        axs.legend()
+        axs.set_xlabel("x")
+        axs.set_ylabel("u")
+        axs.grid(True, which="both", ls=":")
+        fig.savefig(name + "_" + str(mode) + ".png")
