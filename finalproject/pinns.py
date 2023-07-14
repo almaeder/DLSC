@@ -24,6 +24,8 @@ class Pinns:
         ub: float,
         num_eigenfunctions: int,
         max_value: float,
+        potential_type: str,
+        ansatz_type: str,
         device: torch.device
     ):
         self.device = device
@@ -38,7 +40,7 @@ class Pinns:
         self.alpha_sb = 10.0
         self.alpha_norm  = 4000.0
         self.alpha_ortho = 1000.0
-        self.alpha_drive = 200
+        self.alpha_drive = 20
         self.alpha_regu = 1
         self.max_value = max_value
         self.num_eigenfunctions = num_eigenfunctions
@@ -58,7 +60,9 @@ class Pinns:
 
         # Generator of Sobol sequences
         self.soboleng = torch.quasirandom.SobolEngine(dimension=self.domain_extrema.shape[0])
-
+        self.ansatz_type = ansatz_type
+        self.potential_type = potential_type
+        self.potential = common.compute_potential(self.potential_type)
         self.training_set_int, self.training_set_sbl, self.training_set_sbr = self.assemble_datasets()
         self.eigenfunctions = []
 
@@ -162,15 +166,49 @@ class Pinns:
             self.eigenfunctions.append(eigenfunction)
         self.num_eigenfunctions = self.num_eigenfunctions - num
 
+
+    def compute_ansatz_sym(
+        self: object,
+        input_int: torch.Tensor,
+        nn,
+        antisym: bool = True
+    ) -> torch.Tensor:
+        if antisym:
+            fac = -1
+        else:
+            fac = 1
+        input_int_rev = -input_int + self.domain_extrema[0,0] + self.domain_extrema[0,1]
+        func = (nn(input_int)*
+                (1-torch.exp(-10*(input_int-self.domain_extrema[:,0])))*
+                (1-torch.exp(10*(input_int-self.domain_extrema[:,1]))) + self.ub)
+        func_rev = (nn(input_int_rev)*
+                (1-torch.exp(-10*(input_int_rev-self.domain_extrema[:,0])))*
+                (1-torch.exp(10*(input_int_rev-self.domain_extrema[:,1]))) + self.ub)
+        return func + fac*func_rev
+
+    def compute_ansatz_zeroBC(
+        self: object,
+        input_int: torch.Tensor,
+        nn
+    ) -> torch.Tensor:
+        # return nn
+        return (nn(input_int)*
+                (1-torch.exp(-10*(input_int-self.domain_extrema[:,0])))*
+                (1-torch.exp(10*(input_int-self.domain_extrema[:,1]))) + self.ub)
+
+
     def compute_ansatz(
         self: object,
         input_int: torch.Tensor,
-        nn: torch.Tensor
+        nn
     ) -> torch.Tensor:
-        # return nn
-        return (nn*
-                (1-torch.exp(-10*(input_int-self.domain_extrema[:,0])))*
-                (1-torch.exp(10*(input_int-self.domain_extrema[:,1]))) + self.ub)
+        if self.ansatz_type == "sym":
+            return self.compute_ansatz_sym(input_int,nn,antisym=False)
+        if self.ansatz_type == "antisym":
+            return self.compute_ansatz_sym(input_int,nn,antisym=True)
+        if self.ansatz_type == "bare":
+            return self.compute_ansatz_zeroBC(input_int,nn)
+        raise ValueError("Ansatz type not implemented")
 
     def compute_pde_residual(
         self: object,
@@ -192,7 +230,7 @@ class Pinns:
 
         grad_func_xx = torch.autograd.grad(grad_func.sum(), input_int, create_graph=True)[0][:, 0]
 
-        potential = common.compute_potential(input_int)
+        potential = self.potential(input_int)
         residual_pde = grad_func_xx + torch.squeeze((eigenvalue**2 - potential) * func)
 
         # for i in range(self.num_eigenfunctions):
@@ -239,10 +277,10 @@ class Pinns:
         func_sum_prev = torch.zeros_like(func, requires_grad=False)
         #func_gold = torch.sqrt(torch.tensor(2.0))*torch.sin(torch.tensor(3 * math.pi)*input_int)
         for eigenfunction in self.eigenfunctions:
-            func_prev = self.compute_ansatz(input_int,eigenfunction(input_int))
+            func_prev = self.compute_ansatz(input_int,eigenfunction)
             ortho = torch.sum(func*func_prev)/num_samples
             #ortho_gold = torch.sum(func_gold*func_prev)/num_samples
-            func_sum_prev += self.compute_ansatz(input_int,eigenfunction(input_int))/num_samples
+            func_sum_prev += self.compute_ansatz(input_int,eigenfunction)/num_samples
             loss += (ortho)**2
             #loss_gold += (ortho_gold)**2
             print("Ortho: ",  round(ortho.item(), 4))
@@ -276,13 +314,13 @@ class Pinns:
         # enable auto differentiation
         input_int.requires_grad = True
 
-        func = self.compute_ansatz(input_int,self.approximate_solution(input_int))
+        func = self.compute_ansatz(input_int,self.approximate_solution)
 
         eigenvalue = self.approximate_solution.eigenvalue
 
         residual_pde = self.compute_pde_residual(input_int,func,eigenvalue)
-        residual_sbl = self.compute_ansatz(input_sbl,self.approximate_solution(input_sbl)) - output_sbl
-        residual_sbr = self.compute_ansatz(input_sbr,self.approximate_solution(input_sbr)) - output_sbr
+        residual_sbl = self.compute_ansatz(input_sbl,self.approximate_solution) - output_sbl
+        residual_sbr = self.compute_ansatz(input_sbr,self.approximate_solution) - output_sbr
 
         loss_pde = torch.mean(abs(residual_pde)**2)
         loss_sbl = self.alpha_sb*torch.mean(abs(residual_sbl)**2)
@@ -327,7 +365,7 @@ class Pinns:
         # enable auto differentiation
         input_int.requires_grad = True
 
-        func = self.compute_ansatz(input_int,self.approximate_solution(input_int))
+        func = self.compute_ansatz(input_int,self.approximate_solution)
 
         eigenvalue = self.approximate_solution.eigenvalue
 
@@ -512,7 +550,7 @@ class Pinns:
         inputs = self.convert(inputs)
         inputs = inputs.to(self.device)
         
-        output = self.compute_ansatz(inputs,self.approximate_solution(inputs)).detach().cpu()
+        output = self.compute_ansatz(inputs,self.approximate_solution).detach().cpu()
 
         fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
         axs.scatter(inputs[:, 0].detach().cpu(), output[:,0])
@@ -536,7 +574,7 @@ class Pinns:
         for i,eigenfunction in enumerate(self.eigenfunctions):
             print(eigenfunction.eigenvalue.detach().item(), eigenfunction.eigenvalue.detach().item()**2)
 
-            output = self.compute_ansatz(inputs,eigenfunction(inputs)).detach().cpu()
+            output = self.compute_ansatz(inputs,eigenfunction).detach().cpu()
 
             # plot both fluid and solid temperature
             fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
@@ -562,7 +600,7 @@ class Pinns:
         inputs = self.convert(inputs)
         inputs = inputs.to(self.device)
         inputss = inputs[:, 0].detach().cpu().numpy()
-        output = self.compute_ansatz(inputs,self.eigenfunctions[mode](inputs)).detach().cpu()**2/num_samples
+        output = self.compute_ansatz(inputs,self.eigenfunctions[mode]).detach().cpu()**2/num_samples
         fig, axs = plt.subplots(1, 1, figsize=(16, 8), dpi=150)
         axs.scatter(inputss, output[:,0], label="NN")
         axs.scatter(grid_fd, solution_fd**2, label="FD")

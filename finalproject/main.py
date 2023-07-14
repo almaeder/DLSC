@@ -37,12 +37,15 @@ if __name__ == "__main__":
     xl = 0.0
     xr = 5.0
     ub = 0.0
-    num_eig = 6
-    load_eig = 1
-    max_value = 10.0
-    pinn = pinns.Pinns(n_int, n_sb, batchsize_int, batchsize_sb, xl, xr, ub, num_eig, max_value, device)
+    num_eig = 4
+    load_eig = 0
+    max_value = 20.0
+    potential_type = "rtd" # "rtd", "infinite_well", "double_well"
+    ansatz_type = "sym" # "sym","antisym", "bare"
+    pinn = pinns.Pinns(n_int, n_sb, batchsize_int, batchsize_sb, xl, xr, ub, num_eig, max_value, potential_type, ansatz_type, device)
 
-    pinn.load_eigenfunctions(main_path + "/2", load_eig)
+    pinn_name = potential_type + "_"
+    pinn.load_eigenfunctions(main_path + "/" + pinn_name, load_eig)
 
 
     n_epochs = 1
@@ -77,10 +80,10 @@ if __name__ == "__main__":
     # plot the predicted solution
     fig_path = os.path.join(main_path, "prediction")
     pinn.plotting_multiple(name=fig_path)
-    pinn.save_eigenfunctions(main_path + "/2")
+    pinn.save_eigenfunctions(main_path + "/" + pinn_name)
 
 
-    solver = fd.FD_solver(xl, xr, 501)
+    solver = fd.FD_solver(xl, xr, 501, potential_type)
     solver.assemble()
     solver.eigensolve(num_eig=num_eig)
 

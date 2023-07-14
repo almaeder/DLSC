@@ -10,7 +10,8 @@ class FD_solver:
         self: object,
         xl: float,
         xr: float,
-        n: float
+        n: float,
+        potential_type: str,
     ):
         self.h = (xr-xl) / n
         self.N = n-1
@@ -18,7 +19,7 @@ class FD_solver:
         assert np.allclose(self.grid[1]-self.grid[0],self.h)
         assert np.allclose(self.grid[-1]+self.h,xr)
         assert np.allclose(self.grid[0]-self.h,xl)
-        self.potential = common.compute_potential(torch.from_numpy(self.grid)).cpu().numpy()
+        self.potential = common.compute_potential(potential_type)(torch.from_numpy(self.grid)).cpu().numpy()
         self.H = 0
         self.eigenvalues, self.eigenfunctions = 0, 0
 

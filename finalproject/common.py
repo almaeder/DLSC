@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch
 import os
 
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 torch.manual_seed(42)
 
 
@@ -111,7 +111,7 @@ class NeuralNet(nn.Module):
 
         def init_weights(m):
             if type(m) == nn.Linear and m.weight.requires_grad and m.bias.requires_grad:
-                g = nn.init.calculate_gain('tanh')
+                g = nn.init.calculate_gain("tanh")
                 torch.nn.init.xavier_uniform_(m.weight, gain=g)
                 # torch.nn.init.xavier_normal_(m.weight, gain=g)
                 m.bias.data.fill_(0)
@@ -121,7 +121,7 @@ class NeuralNet(nn.Module):
     def regularization(self):
         reg_loss = 0
         for name, param in self.named_parameters():
-            if 'weight' in name:
+            if "weight" in name:
                 reg_loss = reg_loss + torch.norm(param, self.regularization_exp)
         return self.regularization_param * reg_loss
 
@@ -149,6 +149,12 @@ def compute_potential_rtd(
             torch.logical_and((pos_rs <= input_int),(pos_re >= input_int))).double()
 
 def compute_potential(
-    input_int: torch.Tensor
+    potential_type: str
 ) -> torch.Tensor:
-    return compute_potential_rtd(input_int)
+    if potential_type == "infinite_well":
+        return compute_potential_infinite_well
+    if potential_type == "double_well":
+        return compute_potential_double_well
+    if potential_type == "rtd":
+        return compute_potential_rtd
+    raise ValueError("Invalid potential type")
