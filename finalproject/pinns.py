@@ -495,20 +495,32 @@ class Pinns:
             if i == 1:
                 max_iter *=1
                 max_eval *=1
-                self.alpha_ortho *= 1
-                self.alpha_norm *= 1
+                if(self.potential_type == "infinite_well"):
+                    self.alpha_ortho *= 2 
+                    self.alpha_norm *= 10
+                else:
+                    self.alpha_ortho *= 1
+                    self.alpha_norm *= 1
             if i == 2:
                 max_iter *=1
                 max_eval *=1
                 self.approximate_solution.init_xavier()
-                self.alpha_ortho *= 1
-                self.alpha_norm *= 1
+                if(self.potential_type == "infinite_well"):
+                    self.alpha_ortho *= 20
+                    self.alpha_norm *= 20
+                else:
+                    self.alpha_ortho *= 1
+                    self.alpha_norm *= 1
             if i == 3:
                 max_iter *=1
                 max_eval *=1
                 self.approximate_solution.init_xavier()
-                self.alpha_ortho *= 2
-                self.alpha_norm *= 2
+                if(self.potential_type == "infinite_well"):
+                    self.alpha_ortho *= 10
+                    self.alpha_norm *= 2
+                else:
+                    self.alpha_ortho *= 2
+                    self.alpha_norm *= 2
 
             history += self.fit_no_boundary(num_epochs, optimizer, verbose=verbose)
 

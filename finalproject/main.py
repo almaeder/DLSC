@@ -35,13 +35,13 @@ if __name__ == "__main__":
     batchsize_int = n_int // nb_int
     batchsize_sb = n_sb // nb_sb
     xl = 0.0
-    xr = 5.0
+    xr = 1.0
     ub = 0.0
     num_eig = 4
     load_eig = 0
     max_value = 20.0
-    potential_type = "rtd" # "rtd", "infinite_well", "double_well"
-    ansatz_type = "sym" # "sym","antisym", "bare"
+    potential_type = "infinite_well" # "rtd", "infinite_well", "double_well"
+    ansatz_type = "bare" # "sym","antisym", "bare"
     pinn = pinns.Pinns(n_int, n_sb, batchsize_int, batchsize_sb, xl, xr, ub, num_eig, max_value, potential_type, ansatz_type, device)
 
     pinn_name = potential_type + "_"
@@ -85,10 +85,10 @@ if __name__ == "__main__":
 
     solver = fd.FD_solver(xl, xr, 501, potential_type)
     solver.assemble()
-    solver.eigensolve(num_eig=num_eig)
+    solver.eigensolve(num_eig=num_eig+1)
 
     # fig_path = os.path.join(main_path, "comparison")
     # for i in range(num_eig):
     #     pinn.plotting_prob_amplitude_fd(i, solver.grid, solver.eigenfunctions[:,i],name=fig_path)
     fig_path = os.path.join(main_path, "fd")
-    solver.plot(num_eig=num_eig,name=fig_path)
+    solver.plot(num_eig=num_eig+1,name=fig_path)

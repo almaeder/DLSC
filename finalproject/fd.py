@@ -55,9 +55,9 @@ class FD_solver:
       name: str = "plot"
     ):
         fig = plt.figure(dpi=150)
-        plt.plot(self.grid, self.potential/(self.potential.max() + np.finfo(float).eps)*(self.eigenfunctions**2).max(), label="potential")
+        plt.plot(self.grid, 15*self.potential/(self.potential.max() + np.finfo(float).eps)*(np.abs(self.eigenfunctions)).max(), label="potential")
         for i in range(num_eig):
-            plt.plot(self.grid, self.eigenfunctions[:,i]**2, label=str(self.eigenvalues[i]))
+            plt.plot(self.grid, self.eigenfunctions[:,i] * 2 + self.eigenvalues[i] * (np.abs(self.eigenfunctions)).max()/5, label=str(self.eigenvalues[i]))
         plt.legend(loc="upper left")
         # plt.show()
         fig.savefig(name+".png")
